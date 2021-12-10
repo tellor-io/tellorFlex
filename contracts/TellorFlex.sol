@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.3;
 
-interface IERC20 {
-    function balanceOf(address account) external view returns (uint256);
+import "./interfaces/IERC20.sol";
 
-    function transfer(address recipient, uint256 amount)
-        external
-        returns (bool);
-}
-
+/**
+ @author Tellor Inc.
+ @title TellorFlex
+ @dev This is a streamlined Tellor oracle system which handles staking, reporting,
+ * slashing, and user data getters in one contract. This contract is controlled
+ * by a single address known as 'governance', which could be an externally owned
+ * account or a contract, allowing for a flexible, modular design.
+*/
 contract TellorFlex {
     IERC20 public token;
     address public governance;
