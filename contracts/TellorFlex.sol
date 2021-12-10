@@ -3,7 +3,10 @@ pragma solidity 0.8.3;
 
 interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
-    function transfer(address recipient, uint256 amount) external returns (bool);
+
+    function transfer(address recipient, uint256 amount)
+        external
+        returns (bool);
 }
 
 contract TellorFlex {
@@ -19,7 +22,8 @@ contract TellorFlex {
     mapping(bytes32 => mapping(uint256 => bytes)) public values; //queryId -> timestamp -> value
     mapping(address => StakeInfo) stakerDetails; //mapping from a persons address to their staking info
     mapping(address => uint256) private reporterLastTimestamp; // mapping of reporter addresses to the timestamp of their last reported value
-    mapping(address => mapping(bytes32 => uint256)) public reportsSubmittedByAddressAndQueryId;
+    mapping(address => mapping(bytes32 => uint256))
+        public reportsSubmittedByAddressAndQueryId;
 
     // Structs
     struct Report {
@@ -49,7 +53,11 @@ contract TellorFlex {
     event NewReportingLock(uint256 _newReportingLock);
     event NewStakeAmount(uint256 _newStakeAmount);
     event NewStaker(address _staker);
-    event ReporterSlashed(address _reporter, address _recipient, uint256 _slashAmount);
+    event ReporterSlashed(
+        address _reporter,
+        address _recipient,
+        uint256 _slashAmount
+    );
     event StakeWithdrawRequested(address _staker, uint256 _amount);
     event StakeWithdrawn(address _staker);
     event ValueRemoved(bytes32 _queryId, uint256 _timestamp);
@@ -61,11 +69,16 @@ contract TellorFlex {
      * @param _stakeAmount amount of token needed to report oracle values
      * @param _reportingLock base amount of time (seconds) before reporter is able to report again
      */
-    constructor(address _token, address _governance, uint256 _stakeAmount, uint256 _reportingLock) {
-      token = IERC20(_token);
-      governance = _governance;
-      stakeAmount = _stakeAmount;
-      reportingLock = _reportingLock;
+    constructor(
+        address _token,
+        address _governance,
+        uint256 _stakeAmount,
+        uint256 _reportingLock
+    ) {
+        token = IERC20(_token);
+        governance = _governance;
+        stakeAmount = _stakeAmount;
+        reportingLock = _reportingLock;
     }
 
     /**
@@ -73,9 +86,9 @@ contract TellorFlex {
      * @param _newGovernanceAddress new governance address
      */
     function changeGovernanceAddress(address _newGovernanceAddress) external {
-      require(msg.sender == governance, "caller must be governance address");
-      governance = _newGovernanceAddress;
-      emit NewGovernanceAddress(_newGovernanceAddress);
+        require(msg.sender == governance, "caller must be governance address");
+        governance = _newGovernanceAddress;
+        emit NewGovernanceAddress(_newGovernanceAddress);
     }
 
     /**
@@ -83,9 +96,9 @@ contract TellorFlex {
      * @param _newReportingLock new reporter lock time in seconds
      */
     function changeReportingLock(uint256 _newReportingLock) external {
-      require(msg.sender == governance, "caller must be governance address");
-      reportingLock = _newReportingLock;
-      emit NewReportingLock(_newReportingLock);
+        require(msg.sender == governance, "caller must be governance address");
+        reportingLock = _newReportingLock;
+        emit NewReportingLock(_newReportingLock);
     }
 
     /**
@@ -93,9 +106,9 @@ contract TellorFlex {
      * @param _newStakeAmount new reporter stake amount
      */
     function changeStakeAmount(uint256 _newStakeAmount) external {
-      require(msg.sender == governance, "caller must be governance address");
-      stakeAmount = _newStakeAmount;
-      emit NewStakeAmount(_newStakeAmount);
+        require(msg.sender == governance, "caller must be governance address");
+        stakeAmount = _newStakeAmount;
+        emit NewStakeAmount(_newStakeAmount);
     }
 
     /**
@@ -105,7 +118,7 @@ contract TellorFlex {
         // transfer stakeAmount from staker to here?
 
         StakeInfo storage _staker = stakerDetails[msg.sender];
-        if(_staker.lockedAmount >= stakeAmount) {
+        if (_staker.lockedAmount >= stakeAmount) {
             _staker.lockedAmount -= stakeAmount;
         } else {
             require(token.transfer(address(this), stakeAmount));
@@ -161,12 +174,18 @@ contract TellorFlex {
      * @param _reporter is the address of the reporter being slashed
      * @param _recipient is the address receiving the reporter's stake
      */
-    function slashReporter(address _reporter, address _recipient) external returns(uint256) {
+    function slashReporter(address _reporter, address _recipient)
+        external
+        returns (uint256)
+    {
         require(msg.sender == governance, "Only governance can slash reporter");
         StakeInfo storage _staker = stakerDetails[_reporter];
-        require(_staker.balance + _staker.lockedAmount > 0, "Zero staker balance");
+        require(
+            _staker.balance + _staker.lockedAmount > 0,
+            "Zero staker balance"
+        );
         uint256 _slashAmount;
-        if(_staker.lockedAmount >= stakeAmount) {
+        if (_staker.lockedAmount >= stakeAmount) {
             _slashAmount = stakeAmount;
             _staker.lockedAmount -= stakeAmount;
         } else if (_staker.lockedAmount + _staker.balance >= stakeAmount) {
@@ -181,7 +200,7 @@ contract TellorFlex {
         token.transfer(_recipient, _slashAmount);
         totalStakeAmount -= _slashAmount;
         emit ReporterSlashed(_reporter, _recipient, _slashAmount);
-        return(_slashAmount);
+        return (_slashAmount);
     }
 
     /**
@@ -205,15 +224,20 @@ contract TellorFlex {
         StakeInfo storage _staker = stakerDetails[msg.sender];
         // Require reporter to abide by given reporting lock
         require(
-            block.timestamp - reporterLastTimestamp[msg.sender] > reportingLock / (_staker.balance / stakeAmount),
-            "still in reporter time lock, please wait!");
+            block.timestamp - reporterLastTimestamp[msg.sender] >
+                reportingLock / (_staker.balance / stakeAmount),
+            "still in reporter time lock, please wait!"
+        );
 
         require(
             _queryId == keccak256(_queryData) || uint256(_queryId) <= 100,
             "id must be hash of bytes data"
         );
         // Check is in case the stake amount increases
-        require(_staker.balance >= stakeAmount, "balance must be greater than stake amount");
+        require(
+            _staker.balance >= stakeAmount,
+            "balance must be greater than stake amount"
+        );
         reporterLastTimestamp[msg.sender] = block.timestamp;
         // Checks for no double reporting of timestamps
         require(
@@ -340,11 +364,10 @@ contract TellorFlex {
      * @param _queryId is the ID of the specific data feed
      * @return uint256 of the number of values submitted by the given reporter to the given queryId
      */
-    function getReportsSubmittedByAddressAndQueryId(address _reporter, bytes32 _queryId)
-        external
-        view
-        returns (uint256)
-    {
+    function getReportsSubmittedByAddressAndQueryId(
+        address _reporter,
+        bytes32 _queryId
+    ) external view returns (uint256) {
         return reportsSubmittedByAddressAndQueryId[_reporter][_queryId];
     }
 
