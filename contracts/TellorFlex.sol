@@ -423,6 +423,14 @@ contract TellorFlex {
     }
 
     /**
+     * @dev Returns total amount of token staked for reporting
+     * @return uint256 total amount of token staked
+     */
+    function getTotalStakeAmount() external view returns (uint256) {
+        return totalStakeAmount;
+    }
+
+    /**
      * @dev Returns the address of the token used for staking
      * @return address of the token used for staking
      */
