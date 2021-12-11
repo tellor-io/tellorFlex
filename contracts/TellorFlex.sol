@@ -142,7 +142,10 @@ contract TellorFlex {
         require(msg.sender == governance, "caller must be governance address");
         Report storage rep = reports[_queryId];
         uint256 _index = rep.timestampIndex[_timestamp];
-        require(_timestamp == reports[_queryId].timestamps[_index], "Invalid value");
+        require(
+            _timestamp == reports[_queryId].timestamps[_index],
+            "Invalid value"
+        );
         // Shift all timestamps back to reflect deletion of value
         for (uint256 i = _index; i < rep.timestamps.length - 1; i++) {
             rep.timestamps[i] = rep.timestamps[i + 1];
@@ -318,13 +321,11 @@ contract TellorFlex {
      * @return uint256 count of the number of values received for the id
      */
     function getNewValueCountbyQueryId(bytes32 _queryId)
-        public
+        external
         view
         returns (uint256)
     {
-        return (
-            return reports[_queryId].timestamps.length;
-        );
+        return reports[_queryId].timestamps.length;
     }
 
     /**
@@ -398,7 +399,11 @@ contract TellorFlex {
     function getStakerInfo(address _staker)
         external
         view
-        returns (uint256, uint256, uint256)
+        returns (
+            uint256,
+            uint256,
+            uint256
+        )
     {
         return (
             stakerDetails[_staker].startDate,
@@ -422,7 +427,7 @@ contract TellorFlex {
      * @return uint256 timestamp
      */
     function getTimestampbyQueryIdandIndex(bytes32 _queryId, uint256 _index)
-        public
+        external
         view
         returns (uint256)
     {
@@ -466,7 +471,7 @@ contract TellorFlex {
      * @return bytes value for timestamp submitted
      */
     function retrieveData(bytes32 _queryId, uint256 _timestamp)
-        public
+        external
         view
         returns (bytes memory)
     {
