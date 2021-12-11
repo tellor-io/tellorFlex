@@ -117,13 +117,11 @@ contract TellorFlex {
      * @dev Allows a reporter to submit stake
      */
     function depositStake() external {
-        // transfer stakeAmount from staker to here?
-
         StakeInfo storage _staker = stakerDetails[msg.sender];
         if (_staker.lockedAmount >= stakeAmount) {
             _staker.lockedAmount -= stakeAmount;
         } else {
-            require(token.transfer(address(this), stakeAmount));
+            require(token.transferFrom(msg.sender, address(this), stakeAmount));
         }
         stakerDetails[msg.sender] = StakeInfo({
             startDate: block.timestamp, // This resets their stake start date to now
@@ -144,6 +142,7 @@ contract TellorFlex {
         require(msg.sender == governance, "caller must be governance address");
         Report storage rep = reports[_queryId];
         uint256 _index = rep.timestampIndex[_timestamp];
+        require(_timestamp == reports[_queryId].timestamps[_index], "Invalid value");
         // Shift all timestamps back to reflect deletion of value
         for (uint256 i = _index; i < rep.timestamps.length - 1; i++) {
             rep.timestamps[i] = rep.timestamps[i + 1];
@@ -385,6 +384,25 @@ contract TellorFlex {
         returns (uint256)
     {
         return reports[_queryId].timestamps[_index];
+    }
+
+    /**
+     * @dev Allows users to retrieve all information about a staker
+     * @param _staker address of staker inquiring about
+     * @return uint startDate of staking
+     * @return uint current amount staked
+     * @return uint current amount locked for withdrawal
+     */
+    function getStakerInfo(address _staker)
+        external
+        view
+        returns (uint256, uint256, uint256)
+    {
+        return (
+            stakerDetails[_staker].startDate,
+            stakerDetails[_staker].balance,
+            stakerDetails[_staker].lockedAmount
+        );
     }
 
     /**
