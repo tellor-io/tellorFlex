@@ -142,7 +142,10 @@ contract TellorFlex {
         require(msg.sender == governance, "caller must be governance address");
         Report storage rep = reports[_queryId];
         uint256 _index = rep.timestampIndex[_timestamp];
-        require(_timestamp == reports[_queryId].timestamps[_index], "Invalid value");
+        require(
+            _timestamp == reports[_queryId].timestamps[_index],
+            "Invalid value"
+        );
         // Shift all timestamps back to reflect deletion of value
         for (uint256 i = _index; i < rep.timestamps.length - 1; i++) {
             rep.timestamps[i] = rep.timestamps[i + 1];
@@ -174,6 +177,7 @@ contract TellorFlex {
      * Note: this function is only callable by the governance address.
      * @param _reporter is the address of the reporter being slashed
      * @param _recipient is the address receiving the reporter's stake
+     * @return uint256 amount of token slashed and sent to recipient address
      */
     function slashReporter(address _reporter, address _recipient)
         external
@@ -312,6 +316,19 @@ contract TellorFlex {
     }
 
     /**
+     * @dev Counts the number of values that have been submitted for the request.
+     * @param _queryId the id to look up
+     * @return uint256 count of the number of values received for the id
+     */
+    function getNewValueCountbyQueryId(bytes32 _queryId)
+        external
+        view
+        returns (uint256)
+    {
+        return reports[_queryId].timestamps.length;
+    }
+
+    /**
      * @dev Returns the reporting lock time, the amount of time a reporter must wait to submit again
      * @return uint256 reporting lock time
      */
@@ -373,20 +390,6 @@ contract TellorFlex {
     }
 
     /**
-     * @dev Returns the timestamp of a reported value given a data ID and timestamp index
-     * @param _queryId is ID of the specific data feed
-     * @param _index is the index of the timestamp
-     * @return uint256 timestamp of the given queryId and index
-     */
-    function getReportTimestampByIndex(bytes32 _queryId, uint256 _index)
-        external
-        view
-        returns (uint256)
-    {
-        return reports[_queryId].timestamps[_index];
-    }
-
-    /**
      * @dev Allows users to retrieve all information about a staker
      * @param _staker address of staker inquiring about
      * @return uint startDate of staking
@@ -396,7 +399,11 @@ contract TellorFlex {
     function getStakerInfo(address _staker)
         external
         view
-        returns (uint256, uint256, uint256)
+        returns (
+            uint256,
+            uint256,
+            uint256
+        )
     {
         return (
             stakerDetails[_staker].startDate,
@@ -406,24 +413,25 @@ contract TellorFlex {
     }
 
     /**
-     * @dev Returns the number of timestamps/reports for a specific data ID
-     * @param _queryId is ID of the specific data feed
-     * @return uint256 of the number of timestamps/reports for the given data ID
-     */
-    function getTimestampCountById(bytes32 _queryId)
-        external
-        view
-        returns (uint256)
-    {
-        return reports[_queryId].timestamps.length;
-    }
-
-    /**
      * @dev Returns the timestamp for the last value of any ID from the oracle
      * @return uint256 of timestamp of the last oracle value
      */
     function getTimeOfLastNewValue() external view returns (uint256) {
         return timeOfLastNewValue;
+    }
+
+    /**
+     * @dev Gets the timestamp for the value based on their index
+     * @param _queryId is the id to look up
+     * @param _index is the value index to look up
+     * @return uint256 timestamp
+     */
+    function getTimestampbyQueryIdandIndex(bytes32 _queryId, uint256 _index)
+        external
+        view
+        returns (uint256)
+    {
+        return reports[_queryId].timestamps[_index];
     }
 
     /**
@@ -457,12 +465,12 @@ contract TellorFlex {
     }
 
     /**
-     * @dev Returns the value of a data feed given a specific ID and timestamp
-     * @param _queryId is the ID of the specific data feed
-     * @param _timestamp is the timestamp to look for data
-     * @return bytes memory of the value of data at the associated timestamp
+     * @dev Retrieve value from oracle based on timestamp
+     * @param _queryId being requested
+     * @param _timestamp to retrieve data/value from
+     * @return bytes value for timestamp submitted
      */
-    function getValueByTimestamp(bytes32 _queryId, uint256 _timestamp)
+    function retrieveData(bytes32 _queryId, uint256 _timestamp)
         external
         view
         returns (bytes memory)
