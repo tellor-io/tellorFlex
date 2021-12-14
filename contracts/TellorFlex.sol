@@ -137,7 +137,7 @@ contract TellorFlex {
         Report storage rep = reports[_queryId];
         uint256 _index = rep.timestampIndex[_timestamp];
         require(
-            _timestamp == reports[_queryId].timestamps[_index],
+            _timestamp == rep.timestamps[_index],
             "Invalid value"
         );
         // Shift all timestamps back to reflect deletion of value
@@ -190,14 +190,15 @@ contract TellorFlex {
         } else if (_staker.lockedAmount + _staker.balance >= stakeAmount) {
             _slashAmount = stakeAmount;
             _staker.balance -= stakeAmount - _staker.lockedAmount;
+            totalStakeAmount -= stakeAmount - _staker.lockedAmount;
             _staker.lockedAmount = 0;
         } else {
             _slashAmount = _staker.balance + _staker.lockedAmount;
+            totalStakeAmount -= _staker.balance;
             _staker.balance = 0;
             _staker.lockedAmount = 0;
         }
         token.transfer(_recipient, _slashAmount);
-        totalStakeAmount -= _slashAmount;
         emit ReporterSlashed(_reporter, _recipient, _slashAmount);
         return (_slashAmount);
     }
@@ -404,11 +405,15 @@ contract TellorFlex {
      * @return uint startDate of staking
      * @return uint current amount staked
      * @return uint current amount locked for withdrawal
+     * @return uint reporter's last reported timestamp
+     * @return uint total number of reports submitted by reporter
      */
     function getStakerInfo(address _staker)
         external
         view
         returns (
+            uint256,
+            uint256,
             uint256,
             uint256,
             uint256
@@ -417,7 +422,9 @@ contract TellorFlex {
         return (
             stakerDetails[_staker].startDate,
             stakerDetails[_staker].balance,
-            stakerDetails[_staker].lockedAmount
+            stakerDetails[_staker].lockedAmount,
+            stakerDetails[_staker].reporterLastTimestamp,
+            stakerDetails[_staker].reportsSubmitted
         );
     }
 
