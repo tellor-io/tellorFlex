@@ -19,13 +19,7 @@ contract TellorFlex {
     uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
     uint256 public timeOfLastNewValue = block.timestamp; // time of the last new submitted value, originally set to the block timestamp
     mapping(bytes32 => Report) private reports; // mapping of query IDs to a report
-    mapping(address => uint256) private reportsSubmittedByAddress; // mapping of reporter addresses to the number of reports they've submitted
-    mapping(bytes32 => uint256[]) public timestamps;
-    mapping(bytes32 => mapping(uint256 => bytes)) public values; //queryId -> timestamp -> value
     mapping(address => StakeInfo) stakerDetails; //mapping from a persons address to their staking info
-    mapping(address => uint256) private reporterLastTimestamp; // mapping of reporter addresses to the timestamp of their last reported value
-    mapping(address => mapping(bytes32 => uint256))
-        public reportsSubmittedByAddressAndQueryId;
 
     // Structs
     struct Report {
@@ -40,6 +34,9 @@ contract TellorFlex {
         uint256 startDate; //stake start date
         uint256 balance; // staked balance
         uint256 lockedAmount; // amount locked for withdrawal
+        uint256 reporterLastTimestamp; // timestamp of reporter's last reported value
+        uint256 reportsSubmitted; // total number of reports submitted by reporter
+        mapping(bytes32 => uint256) reportsSubmittedByQueryId;
     }
 
     // Events
@@ -54,7 +51,7 @@ contract TellorFlex {
     );
     event NewReportingLock(uint256 _newReportingLock);
     event NewStakeAmount(uint256 _newStakeAmount);
-    event NewStaker(address _staker);
+    event NewStaker(address _staker, uint256 _amount);
     event ReporterSlashed(
         address _reporter,
         address _recipient,
@@ -116,20 +113,17 @@ contract TellorFlex {
     /**
      * @dev Allows a reporter to submit stake
      */
-    function depositStake() external {
+    function depositStake(uint256 _amount) external {
         StakeInfo storage _staker = stakerDetails[msg.sender];
-        if (_staker.lockedAmount >= stakeAmount) {
-            _staker.lockedAmount -= stakeAmount;
+        if (_staker.lockedAmount >= _amount) {
+            _staker.lockedAmount -= _amount;
         } else {
-            require(token.transferFrom(msg.sender, address(this), stakeAmount));
+            require(token.transferFrom(msg.sender, address(this), _amount));
         }
-        stakerDetails[msg.sender] = StakeInfo({
-            startDate: block.timestamp, // This resets their stake start date to now
-            balance: _staker.balance + stakeAmount,
-            lockedAmount: _staker.lockedAmount
-        });
-        totalStakeAmount += stakeAmount;
-        emit NewStaker(msg.sender);
+        _staker.startDate = block.timestamp; // This resets their stake start date to now
+        _staker.balance += _amount;
+        totalStakeAmount += _amount;
+        emit NewStaker(msg.sender, _amount);
     }
 
     /**
@@ -223,17 +217,16 @@ contract TellorFlex {
     ) external {
         Report storage rep = reports[_queryId];
         require(
-            _nonce == rep.timestamps.length,
+            _nonce == rep.timestamps.length || _nonce == 0,
             "nonce must match timestamp index"
         );
         StakeInfo storage _staker = stakerDetails[msg.sender];
         // Require reporter to abide by given reporting lock
         require(
-            block.timestamp - reporterLastTimestamp[msg.sender] >
-                reportingLock / (_staker.balance / stakeAmount),
+            (block.timestamp - _staker.reporterLastTimestamp) * 1000 >
+                reportingLock * 1000 / (_staker.balance / stakeAmount),
             "still in reporter time lock, please wait!"
         );
-
         require(
             _queryId == keccak256(_queryData) || uint256(_queryId) <= 100,
             "id must be hash of bytes data"
@@ -243,7 +236,7 @@ contract TellorFlex {
             _staker.balance >= stakeAmount,
             "balance must be greater than stake amount"
         );
-        reporterLastTimestamp[msg.sender] = block.timestamp;
+        _staker.reporterLastTimestamp = block.timestamp;
         // Checks for no double reporting of timestamps
         require(
             rep.reporterByTimestamp[block.timestamp] == address(0),
@@ -257,8 +250,8 @@ contract TellorFlex {
         rep.reporterByTimestamp[block.timestamp] = msg.sender;
         // Update last oracle value and number of values submitted by a reporter
         timeOfLastNewValue = block.timestamp;
-        reportsSubmittedByAddress[msg.sender]++;
-        reportsSubmittedByAddressAndQueryId[msg.sender][_queryId]++;
+        _staker.reportsSubmitted++;
+        _staker.reportsSubmittedByQueryId[_queryId]++;
         emit NewReport(
             _queryId,
             block.timestamp,
@@ -316,6 +309,14 @@ contract TellorFlex {
     }
 
     /**
+     * @dev Returns governance address
+     * @return address governance
+     */
+    function getGovernanceAddress() external view returns(address) {
+      return governance;
+    }
+
+    /**
      * @dev Counts the number of values that have been submitted for the request.
      * @param _queryId the id to look up
      * @return uint256 count of the number of values received for the id
@@ -360,7 +361,7 @@ contract TellorFlex {
         view
         returns (uint256)
     {
-        return reporterLastTimestamp[_reporter];
+        return stakerDetails[_reporter].reporterLastTimestamp;
     }
 
     /**
@@ -373,7 +374,7 @@ contract TellorFlex {
         view
         returns (uint256)
     {
-        return reportsSubmittedByAddress[_reporter];
+        return stakerDetails[_reporter].reportsSubmitted;
     }
 
     /**
@@ -386,7 +387,15 @@ contract TellorFlex {
         address _reporter,
         bytes32 _queryId
     ) external view returns (uint256) {
-        return reportsSubmittedByAddressAndQueryId[_reporter][_queryId];
+        return stakerDetails[_reporter].reportsSubmittedByQueryId[_queryId];
+    }
+
+    /**
+     * @dev Returns amount required to report oracle values
+     * @return uint256 stake amount
+     */
+    function getStakeAmount() external view returns(uint256) {
+      return stakeAmount;
     }
 
     /**
