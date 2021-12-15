@@ -32,8 +32,8 @@ contract TellorFlex {
 
     struct StakeInfo {
         uint256 startDate; //stake start date
-        uint256 balance; // staked balance
-        uint256 lockedAmount; // amount locked for withdrawal
+        uint256 stakedBalance; // staked balance
+        uint256 lockedBalance; // amount locked for withdrawal
         uint256 reporterLastTimestamp; // timestamp of reporter's last reported value
         uint256 reportsSubmitted; // total number of reports submitted by reporter
         mapping(bytes32 => uint256) reportsSubmittedByQueryId;
@@ -115,13 +115,13 @@ contract TellorFlex {
      */
     function depositStake(uint256 _amount) external {
         StakeInfo storage _staker = stakerDetails[msg.sender];
-        if (_staker.lockedAmount >= _amount) {
-            _staker.lockedAmount -= _amount;
+        if (_staker.lockedBalance >= _amount) {
+            _staker.lockedBalance -= _amount;
         } else {
             require(token.transferFrom(msg.sender, address(this), _amount));
         }
         _staker.startDate = block.timestamp; // This resets their stake start date to now
-        _staker.balance += _amount;
+        _staker.stakedBalance += _amount;
         totalStakeAmount += _amount;
         emit NewStaker(msg.sender, _amount);
     }
@@ -158,10 +158,10 @@ contract TellorFlex {
      */
     function requestStakingWithdraw(uint256 _amount) external {
         StakeInfo storage _staker = stakerDetails[msg.sender];
-        require(_staker.balance >= _amount, "Insufficient staked balance");
+        require(_staker.stakedBalance >= _amount, "Insufficient staked balance");
         _staker.startDate = block.timestamp;
-        _staker.lockedAmount += _amount;
-        _staker.balance -= _amount;
+        _staker.lockedBalance += _amount;
+        _staker.stakedBalance -= _amount;
         totalStakeAmount -= _amount;
         emit StakeWithdrawRequested(msg.sender, _amount);
     }
@@ -180,23 +180,23 @@ contract TellorFlex {
         require(msg.sender == governance, "Only governance can slash reporter");
         StakeInfo storage _staker = stakerDetails[_reporter];
         require(
-            _staker.balance + _staker.lockedAmount > 0,
+            _staker.stakedBalance + _staker.lockedBalance > 0,
             "Zero staker balance"
         );
         uint256 _slashAmount;
-        if (_staker.lockedAmount >= stakeAmount) {
+        if (_staker.lockedBalance >= stakeAmount) {
             _slashAmount = stakeAmount;
-            _staker.lockedAmount -= stakeAmount;
-        } else if (_staker.lockedAmount + _staker.balance >= stakeAmount) {
+            _staker.lockedBalance -= stakeAmount;
+        } else if (_staker.lockedBalance + _staker.stakedBalance >= stakeAmount) {
             _slashAmount = stakeAmount;
-            _staker.balance -= stakeAmount - _staker.lockedAmount;
-            totalStakeAmount -= stakeAmount - _staker.lockedAmount;
-            _staker.lockedAmount = 0;
+            _staker.stakedBalance -= stakeAmount - _staker.lockedBalance;
+            totalStakeAmount -= stakeAmount - _staker.lockedBalance;
+            _staker.lockedBalance = 0;
         } else {
-            _slashAmount = _staker.balance + _staker.lockedAmount;
-            totalStakeAmount -= _staker.balance;
-            _staker.balance = 0;
-            _staker.lockedAmount = 0;
+            _slashAmount = _staker.stakedBalance + _staker.lockedBalance;
+            totalStakeAmount -= _staker.stakedBalance;
+            _staker.stakedBalance = 0;
+            _staker.lockedBalance = 0;
         }
         token.transfer(_recipient, _slashAmount);
         emit ReporterSlashed(_reporter, _recipient, _slashAmount);
@@ -222,20 +222,19 @@ contract TellorFlex {
             "nonce must match timestamp index"
         );
         StakeInfo storage _staker = stakerDetails[msg.sender];
+        require(
+            _staker.stakedBalance >= stakeAmount,
+            "balance must be greater than stake amount"
+        );
         // Require reporter to abide by given reporting lock
         require(
             (block.timestamp - _staker.reporterLastTimestamp) * 1000 >
-                reportingLock * 1000 / (_staker.balance / stakeAmount),
+                reportingLock * 1000 / (_staker.stakedBalance / stakeAmount),
             "still in reporter time lock, please wait!"
         );
         require(
             _queryId == keccak256(_queryData) || uint256(_queryId) <= 100,
             "id must be hash of bytes data"
-        );
-        // Check is in case the stake amount increases
-        require(
-            _staker.balance >= stakeAmount,
-            "balance must be greater than stake amount"
         );
         _staker.reporterLastTimestamp = block.timestamp;
         // Checks for no double reporting of timestamps
@@ -270,9 +269,9 @@ contract TellorFlex {
         StakeInfo storage _s = stakerDetails[msg.sender];
         // Ensure reporter is locked and that enough time has passed
         require(block.timestamp - _s.startDate >= 7 days, "7 days didn't pass");
-        require(_s.lockedAmount > 0, "Reporter not locked for withdrawal");
-        token.transfer(msg.sender, _s.lockedAmount);
-        _s.lockedAmount = 0;
+        require(_s.lockedBalance > 0, "Reporter not locked for withdrawal");
+        token.transfer(msg.sender, _s.lockedBalance);
+        _s.lockedBalance = 0;
         emit StakeWithdrawn(msg.sender);
     }
 
@@ -421,8 +420,8 @@ contract TellorFlex {
     {
         return (
             stakerDetails[_staker].startDate,
-            stakerDetails[_staker].balance,
-            stakerDetails[_staker].lockedAmount,
+            stakerDetails[_staker].stakedBalance,
+            stakerDetails[_staker].lockedBalance,
             stakerDetails[_staker].reporterLastTimestamp,
             stakerDetails[_staker].reportsSubmitted
         );
