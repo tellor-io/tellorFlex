@@ -21,6 +21,7 @@ describe("TellorFlex", function() {
 		tellor = await TellorFlex.deploy(token.address, accounts[0].address, STAKE_AMOUNT, REPORTING_LOCK);
 		await tellor.deployed();
 		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
+		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
 	});
 
 	it("constructor", async function() {
@@ -114,25 +115,70 @@ describe("TellorFlex", function() {
 	it("slashReporter", async function() {
 		await h.expectThrow(tellor.connect(accounts[2]).slashReporter(accounts[1].address, accounts[2].address)) // only gov can slash reporter
 		await h.expectThrow(tellor.connect(accounts[0]).slashReporter(accounts[1].address, accounts[2].address)) // can't slash non-staked address
-		
+		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
+		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("100"))
+		await h.expectThrow(tellor.connect(accounts[2]).slashReporter(accounts[1].address, accounts[2].address)) // only gov can slash reporter
+		// Slash when lockedBalance = 0
+		let stakerDetails = await tellor.getStakerInfo(accounts[1].address)
+		expect(stakerDetails[1]).to.equal(web3.utils.toWei("100"))
+		expect(stakerDetails[2]).to.equal(0)
+		expect(await token.balanceOf(accounts[2].address)).to.equal(0)
+		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("100"))
+		await tellor.slashReporter(accounts[1].address, accounts[2].address)
+		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
+		expect(stakerDetails[1]).to.equal(web3.utils.toWei("90"))
+		expect(stakerDetails[2]).to.equal(0)
+		expect(await token.balanceOf(accounts[2].address)).to.equal(web3.utils.toWei("10"))
+		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("90"))
+		// Slash when lockedBalance >= stakeAmount
+		await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("10"))
+		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
+		expect(stakerDetails[1]).to.equal(web3.utils.toWei("80"))
+		expect(stakerDetails[2]).to.equal(web3.utils.toWei("10"))
+		await tellor.slashReporter(accounts[1].address, accounts[2].address)
+		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
+		expect(stakerDetails[1]).to.equal(web3.utils.toWei("80"))
+		expect(stakerDetails[2]).to.equal(0)
+		expect(await token.balanceOf(accounts[2].address)).to.equal(web3.utils.toWei("20"))
+		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("80"))
+		// Slash when 0 < lockedBalance < stakeAmount
+		await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("5"))
+		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
+		expect(stakerDetails[1]).to.equal(web3.utils.toWei("75"))
+		expect(stakerDetails[2]).to.equal(web3.utils.toWei("5"))
+		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("75"))
+		await tellor.slashReporter(accounts[1].address, accounts[2].address)
+		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
+		expect(stakerDetails[1]).to.equal(web3.utils.toWei("70"))
+		expect(stakerDetails[2]).to.equal(0)
+		expect(await token.balanceOf(accounts[2].address)).to.equal(web3.utils.toWei("30"))
+		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("70"))
+		// Slash when lockedBalance + stakedBalance < stakeAmount
+		await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("65"))
+		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
+		expect(stakerDetails[1]).to.equal(web3.utils.toWei("5"))
+		expect(stakerDetails[2]).to.equal(web3.utils.toWei("65"))
+		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("5"))
+		await h.advanceTime(604800)
+		await tellor.connect(accounts[1]).withdrawStake()
+		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
+		expect(stakerDetails[1]).to.equal(web3.utils.toWei("5"))
+		expect(stakerDetails[2]).to.equal(web3.utils.toWei("0"))
+		await tellor.slashReporter(accounts[1].address, accounts[2].address)
+		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
+		expect(stakerDetails[1]).to.equal(0)
+		expect(stakerDetails[2]).to.equal(0)
+		expect(await token.balanceOf(accounts[2].address)).to.equal(web3.utils.toWei("35"))
+		expect(await tellor.totalStakeAmount()).to.equal(0)
 	})
 
-// slashReporter
-// submitValue
-// withdrawStake
+	// it("submitValue", async function() {
+	// 	await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("120"))
+	// 	await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(4000), 1, '0x')) // wrong nonce
+	// 	await h.expectThrow(tellor.connect(accounts[2]).submitValue(h.uintTob32(1), h.bytes(4000), 1, '0x')) // insufficient staked balance
+	// 	await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(101), h.bytes(4000), 0, '0x')) // non-legacy queryId must equal hash(queryData)
+	// 	await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(4000), 1, '0x')
+	// })
 
-	// it("constructor()", async function() {
-	// 	let quorumFromContract = await dao.quorum();
-	// 	expect(quorumFromContract).to.equal(QUORUM);
-	// 	let proposalTimeWindowFromContract = await dao.proposalTimeWindow();
-	// 	expect(proposalTimeWindowFromContract).to.equal(PROPOSAL_TIME_WINDOW);
-	// 	let memberCountFromContract = await dao.memberCount();
-	// 	expect(memberCountFromContract).to.equal(INITIAL_MEMBER_COUNT);
-	// 	expect(await dao.isMember(accounts[0].address), "Account 0 should be member").to.be.true;
-	// 	expect(await dao.isMember(accounts[1].address), "Account 1 should be member").to.be.true;
-	// 	expect(await dao.isMember(accounts[2].address), "Account 2 should be member").to.be.true;
-	// 	expect(await dao.isMember(accounts[3].address), "Account 3 should be member").to.be.true;
-	// 	expect(await dao.isMember(accounts[4].address), "Account 4 should be member").to.be.true;
-	// 	expect(await dao.isMember(accounts[5].address), "Account 5 should NOT be member").to.be.false;
-	// });
+// withdrawStake
 });
