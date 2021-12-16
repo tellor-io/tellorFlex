@@ -2,7 +2,6 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const h = require("./helpers/helpers");
 const web3 = require('web3');
-// const { time } = require("@openzeppelin/test-helpers");
 
 describe("TellorFlex", function() {
 
