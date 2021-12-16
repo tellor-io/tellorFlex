@@ -83,6 +83,10 @@ advanceTime = async (time) =>{
     return ethers.provider.getBlock()
   }
 
+  function toWei(n){
+    return web3.utils.toWei(n)
+  }
+
 module.exports = {
   stakeAmount: new BN(web3.utils.toWei("500", "ether")),
   timeTarget: 240,
@@ -98,5 +102,6 @@ module.exports = {
   advanceBlock,
   advanceTimeAndBlock,
   takeFifteen,
+  toWei,
   expectThrow,
 };

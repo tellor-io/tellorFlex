@@ -2,7 +2,6 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const h = require("./helpers/helpers");
 const web3 = require('web3');
-// const { time } = require("@openzeppelin/test-helpers");
 
 describe("TellorFlex", function() {
 
@@ -11,6 +10,7 @@ describe("TellorFlex", function() {
 	let accounts;
 	const STAKE_AMOUNT = web3.utils.toWei("10");
 	const REPORTING_LOCK = 43200; // 12 hours
+	const QUERYID1 = h.uintTob32(1)
 
 	beforeEach(async function () {
 		accounts = await ethers.getSigners();
@@ -84,15 +84,15 @@ describe("TellorFlex", function() {
 	it("removeValue", async function() {
 		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
 		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
-		await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
+		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
 		let blocky = await h.getBlock()
-		expect(await tellor.getNewValueCountbyQueryId(h.uintTob32(1))).to.equal(1)
-		expect(await tellor.retrieveData(h.uintTob32(1), blocky.timestamp)).to.equal(h.bytes(100))
-		await h.expectThrow(tellor.connect(accounts[1]).removeValue(h.uintTob32(1), blocky.timestamp)) // only gov can removeValue
-		await tellor.removeValue(h.uintTob32(1), blocky.timestamp)
-		expect(await tellor.getNewValueCountbyQueryId(h.uintTob32(1))).to.equal(0)
-		expect(await tellor.retrieveData(h.uintTob32(1), blocky.timestamp)).to.equal("0x")
-		await h.expectThrow(tellor.removeValue(h.uintTob32(1), blocky.timestamp)) //
+		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(1)
+		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.bytes(100))
+		await h.expectThrow(tellor.connect(accounts[1]).removeValue(QUERYID1, blocky.timestamp)) // only gov can removeValue
+		await tellor.removeValue(QUERYID1, blocky.timestamp)
+		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(0)
+		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal("0x")
+		await h.expectThrow(tellor.removeValue(QUERYID1, blocky.timestamp)) //
 	})
 
 	it("requestStakingWithdraw", async function() {
@@ -172,13 +172,182 @@ describe("TellorFlex", function() {
 		expect(await tellor.totalStakeAmount()).to.equal(0)
 	})
 
-	// it("submitValue", async function() {
-	// 	await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("120"))
-	// 	await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(4000), 1, '0x')) // wrong nonce
-	// 	await h.expectThrow(tellor.connect(accounts[2]).submitValue(h.uintTob32(1), h.bytes(4000), 1, '0x')) // insufficient staked balance
-	// 	await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(101), h.bytes(4000), 0, '0x')) // non-legacy queryId must equal hash(queryData)
-	// 	await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(4000), 1, '0x')
-	// })
+	it("submitValue", async function() {
+		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("120"))
+		await h.expectThrow(tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4000), 1, '0x')) // wrong nonce
+		await h.expectThrow(tellor.connect(accounts[2]).submitValue(QUERYID1, h.uintTob32(4000), 1, '0x')) // insufficient staked balance
+		await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(101), h.uintTob32(4000), 0, '0x')) // non-legacy queryId must equal hash(queryData)
+		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await h.expectThrow(tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4000), 1, '0x')) // still in reporting lock
+		await h.advanceTime(3600) // 1 hour
+		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4001), 1, '0x')
+		blocky = await h.getBlock()
+		expect(await tellor.getTimestampIndexByTimestamp(QUERYID1, blocky.timestamp)).to.equal(1)
+		expect(await tellor.getTimestampbyQueryIdandIndex(QUERYID1, 1)).to.equal(blocky.timestamp)
+		expect(await tellor.getBlockNumberByTimestamp(QUERYID1, blocky.timestamp)).to.equal(blocky.number)
+		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.uintTob32(4001))
+		expect(await tellor.getReporterByTimestamp(QUERYID1, blocky.timestamp)).to.equal(accounts[1].address)
+		expect(await tellor.timeOfLastNewValue()).to.equal(blocky.timestamp)
+		expect(await tellor.getReportsSubmittedByAddress(accounts[1].address)).to.equal(2)
+		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, QUERYID1)).to.equal(2)
+	})
 
-// withdrawStake
+	it("withdrawStake", async function() {
+		await token.connect(accounts[1]).transfer(tellor.address, web3.utils.toWei("100"))
+		await h.expectThrow(tellor.connect(accounts[1]).withdrawStake()) // reporter not locked for withdrawal
+		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("100"))
+		await h.expectThrow(tellor.connect(accounts[1]).withdrawStake()) // reporter not locked for withdrawal
+		await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("10"))
+		await h.expectThrow(tellor.connect(accounts[1]).withdrawStake()) // 7 days didn't pass
+		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
+		expect(stakerDetails[1]).to.equal(h.toWei("90"))
+		expect(stakerDetails[2]).to.equal(h.toWei("10"))
+		await h.advanceTime(60*60*24*7)
+		expect(await token.balanceOf(accounts[1].address)).to.equal(h.toWei("800"))
+		await tellor.connect(accounts[1]).withdrawStake()
+		expect(await token.balanceOf(accounts[1].address)).to.equal(h.toWei("810"))
+		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
+		expect(stakerDetails[1]).to.equal(h.toWei("90"))
+		expect(stakerDetails[2]).to.equal(0)
+		await h.expectThrow(tellor.connect(accounts[1]).withdrawStake()) // reporter not locked for withdrawal
+	})
+
+	it("getBlockNumberByTimestamp", async function() {
+		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("100"))
+		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		blocky = await h.getBlock()
+		expect(await tellor.getBlockNumberByTimestamp(QUERYID1, blocky.timestamp)).to.equal(blocky.number)
+	})
+
+	it("getCurrentValue", async function() {
+		tellor = await tellor.connect(accounts[1])
+		await tellor.depositStake(web3.utils.toWei("100"))
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		expect(await tellor.getCurrentValue(QUERYID1)).to.equal(h.uintTob32(4000))
+	})
+
+	it("getGovernanceAddress", async function() {
+		expect(await tellor.getGovernanceAddress()).to.equal(accounts[0].address)
+	})
+
+	it("getNewValueCountbyQueryId", async function() {
+		tellor = await tellor.connect(accounts[1])
+		await tellor.depositStake(web3.utils.toWei("100"))
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await h.advanceTime(60*60*12)
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(2)
+	})
+
+	it("getReportingLock", async function() {
+		expect(await tellor.getReportingLock()).to.equal(REPORTING_LOCK)
+	})
+
+	it("getNewValueCountbyQueryId", async function() {
+		tellor = await tellor.connect(accounts[1])
+		await tellor.depositStake(web3.utils.toWei("100"))
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		blocky = await h.getBlock()
+		expect(await tellor.getReporterByTimestamp(QUERYID1, blocky.timestamp)).to.equal(accounts[1].address)
+	})
+
+	it("getReporterLastTimestamp", async function() {
+		tellor = await tellor.connect(accounts[1])
+		await tellor.depositStake(web3.utils.toWei("100"))
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await h.advanceTime(60*60*12)
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		blocky = await h.getBlock()
+		expect(await tellor.getReporterLastTimestamp(accounts[1].address)).to.equal(blocky.timestamp)
+	})
+
+	it("getReportsSubmittedByAddress", async function() {
+		tellor = await tellor.connect(accounts[1])
+		await tellor.depositStake(web3.utils.toWei("100"))
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await h.advanceTime(60*60*12)
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		blocky = await h.getBlock()
+		expect(await tellor.getReportsSubmittedByAddress(accounts[1].address)).to.equal(2)
+	})
+
+	it("getReportsSubmittedByAddressAndQueryId", async function() {
+		tellor = await tellor.connect(accounts[1])
+		await tellor.depositStake(web3.utils.toWei("100"))
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await h.advanceTime(60*60*12)
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		blocky = await h.getBlock()
+		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, QUERYID1)).to.equal(2)
+	})
+
+	it("getStakeAmount", async function() {
+		expect(await tellor.getStakeAmount()).to.equal(STAKE_AMOUNT)
+	})
+
+	it("getStakerInfo", async function() {
+		tellor = await tellor.connect(accounts[1])
+		await tellor.depositStake(h.toWei("100"))
+		await tellor.requestStakingWithdraw(h.toWei("10"))
+		blocky = await h.getBlock()
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		blocky2 = await h.getBlock()
+		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
+		expect(stakerDetails[0]).to.equal(blocky.timestamp)
+		expect(stakerDetails[1]).to.equal(h.toWei("90"))
+		expect(stakerDetails[2]).to.equal(h.toWei("10"))
+		expect(stakerDetails[3]).to.equal(blocky2.timestamp)
+		expect(stakerDetails[4]).to.equal(1)
+	})
+
+	it("getTimeOfLastNewValue", async function() {
+		tellor = await tellor.connect(accounts[1])
+		await tellor.depositStake(web3.utils.toWei("100"))
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await h.advanceTime(60*60*12)
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		blocky = await h.getBlock()
+		expect(await tellor.getTimeOfLastNewValue()).to.equal(blocky.timestamp)
+	})
+
+	it("getTimestampbyQueryIdandIndex", async function() {
+		tellor = await tellor.connect(accounts[1])
+		await tellor.depositStake(web3.utils.toWei("100"))
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await h.advanceTime(60*60*12)
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		blocky = await h.getBlock()
+		expect(await tellor.getTimestampbyQueryIdandIndex(QUERYID1, 1)).to.equal(blocky.timestamp)
+	})
+
+	it("getTimestampIndexByTimestamp", async function() {
+		tellor = await tellor.connect(accounts[1])
+		await tellor.depositStake(web3.utils.toWei("100"))
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await h.advanceTime(60*60*12)
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		blocky = await h.getBlock()
+		expect(await tellor.getTimestampIndexByTimestamp(QUERYID1, blocky.timestamp)).to.equal(1)
+	})
+
+	it("getTotalStakeAmount", async function() {
+		tellor = await tellor.connect(accounts[1])
+		await tellor.depositStake(h.toWei("100"))
+		await tellor.requestStakingWithdraw(h.toWei("10"))
+		expect(await tellor.getTotalStakeAmount()).to.equal(h.toWei("90"))
+	})
+
+	it("getTokenAddress", async function() {
+		expect(await tellor.getTokenAddress()).to.equal(token.address)
+	})
+
+	it("retrieveData", async function() {
+		tellor = await tellor.connect(accounts[1])
+		await tellor.depositStake(web3.utils.toWei("100"))
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await h.advanceTime(60*60*12)
+		await tellor.submitValue(QUERYID1, h.uintTob32(4001), 0, '0x')
+		blocky = await h.getBlock()
+		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.uintTob32(4001))
+	})
 });
