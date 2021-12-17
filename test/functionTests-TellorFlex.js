@@ -273,8 +273,7 @@ describe("TellorFlex", function() {
 		tellor = await tellor.connect(accounts[1])
 		await tellor.depositStake(web3.utils.toWei("100"))
 		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
-		blocky = await h.getBlock()
-		expect(await tellor.getReporterByTimestamp(QUERYID1, blocky.timestamp)).to.equal(accounts[1].address)
+		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(1)
 	})
 
 	it("getReporterLastTimestamp", async function() {
