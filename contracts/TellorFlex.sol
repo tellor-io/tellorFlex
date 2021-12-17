@@ -136,10 +136,7 @@ contract TellorFlex {
         require(msg.sender == governance, "caller must be governance address");
         Report storage rep = reports[_queryId];
         uint256 _index = rep.timestampIndex[_timestamp];
-        require(
-            _timestamp == rep.timestamps[_index],
-            "Invalid value"
-        );
+        require(_timestamp == rep.timestamps[_index], "Invalid value");
         // Shift all timestamps back to reflect deletion of value
         for (uint256 i = _index; i < rep.timestamps.length - 1; i++) {
             rep.timestamps[i] = rep.timestamps[i + 1];
@@ -158,7 +155,10 @@ contract TellorFlex {
      */
     function requestStakingWithdraw(uint256 _amount) external {
         StakeInfo storage _staker = stakerDetails[msg.sender];
-        require(_staker.stakedBalance >= _amount, "Insufficient staked balance");
+        require(
+            _staker.stakedBalance >= _amount,
+            "Insufficient staked balance"
+        );
         _staker.startDate = block.timestamp;
         _staker.lockedBalance += _amount;
         _staker.stakedBalance -= _amount;
@@ -187,7 +187,9 @@ contract TellorFlex {
         if (_staker.lockedBalance >= stakeAmount) {
             _slashAmount = stakeAmount;
             _staker.lockedBalance -= stakeAmount;
-        } else if (_staker.lockedBalance + _staker.stakedBalance >= stakeAmount) {
+        } else if (
+            _staker.lockedBalance + _staker.stakedBalance >= stakeAmount
+        ) {
             _slashAmount = stakeAmount;
             _staker.stakedBalance -= stakeAmount - _staker.lockedBalance;
             totalStakeAmount -= stakeAmount - _staker.lockedBalance;
@@ -229,7 +231,7 @@ contract TellorFlex {
         // Require reporter to abide by given reporting lock
         require(
             (block.timestamp - _staker.reporterLastTimestamp) * 1000 >
-                reportingLock * 1000 / (_staker.stakedBalance / stakeAmount),
+                (reportingLock * 1000) / (_staker.stakedBalance / stakeAmount),
             "still in reporter time lock, please wait!"
         );
         require(
@@ -312,8 +314,8 @@ contract TellorFlex {
      * @dev Returns governance address
      * @return address governance
      */
-    function getGovernanceAddress() external view returns(address) {
-      return governance;
+    function getGovernanceAddress() external view returns (address) {
+        return governance;
     }
 
     /**
@@ -327,6 +329,25 @@ contract TellorFlex {
         returns (uint256)
     {
         return reports[_queryId].timestamps.length;
+    }
+
+    /**
+     * @dev Returns reporter address and whether a value was removed for a given queryId and timestamp
+     * @param _queryId the id to look up
+     * @param _timestamp is the timestamp of the value to look up
+     * @return address reporter who submitted the value
+     * @return bool true if the value was removed
+     */
+    function getReportDetails(bytes32 _queryId, uint256 _timestamp)
+        external
+        view
+        returns (address, bool)
+    {
+        bool _wasRemoved = reports[_queryId].timestampIndex[_timestamp] == 0 &&
+            keccak256(reports[_queryId].valueByTimestamp[_timestamp]) ==
+            keccak256(bytes("")) &&
+            reports[_queryId].reporterByTimestamp[_timestamp] != address(0);
+        return (reports[_queryId].reporterByTimestamp[_timestamp], _wasRemoved);
     }
 
     /**
@@ -394,8 +415,8 @@ contract TellorFlex {
      * @dev Returns amount required to report oracle values
      * @return uint256 stake amount
      */
-    function getStakeAmount() external view returns(uint256) {
-      return stakeAmount;
+    function getStakeAmount() external view returns (uint256) {
+        return stakeAmount;
     }
 
     /**

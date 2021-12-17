@@ -239,11 +239,37 @@ describe("TellorFlex", function() {
 		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(2)
 	})
 
+	it("getReportDetails", async function() {
+		tellor = await tellor.connect(accounts[1])
+		await tellor.depositStake(web3.utils.toWei("100"))
+		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		blocky1 = await h.getBlock()
+		await h.advanceTime(60*60*12)
+		await tellor.submitValue(QUERYID1, h.uintTob32(4001), 0, '0x')
+		blocky2 = await h.getBlock()
+		await h.advanceTime(60*60*12)
+		await tellor.submitValue(QUERYID1, h.uintTob32(4002), 0, '0x')
+		blocky3 = await h.getBlock()
+		await tellor.connect(accounts[0]).removeValue(QUERYID1, blocky3.timestamp)
+		reportDetails = await tellor.getReportDetails(QUERYID1, blocky1.timestamp)
+		expect(reportDetails[0]).to.equal(accounts[1].address)
+		expect(reportDetails[1]).to.equal(false)
+		reportDetails = await tellor.getReportDetails(QUERYID1, blocky2.timestamp)
+		expect(reportDetails[0]).to.equal(accounts[1].address)
+		expect(reportDetails[1]).to.equal(false)
+		reportDetails = await tellor.getReportDetails(QUERYID1, blocky3.timestamp)
+		expect(reportDetails[0]).to.equal(accounts[1].address)
+		expect(reportDetails[1]).to.equal(true)
+		reportDetails = await tellor.getReportDetails(h.uintTob32(2), blocky1.timestamp)
+		expect(reportDetails[0]).to.equal(h.zeroAddress)
+		expect(reportDetails[1]).to.equal(false)
+	})
+
 	it("getReportingLock", async function() {
 		expect(await tellor.getReportingLock()).to.equal(REPORTING_LOCK)
 	})
 
-	it("getNewValueCountbyQueryId", async function() {
+	it("getReporterByTimestamp", async function() {
 		tellor = await tellor.connect(accounts[1])
 		await tellor.depositStake(web3.utils.toWei("100"))
 		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
