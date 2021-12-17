@@ -35,7 +35,7 @@ describe("TellorFlex e2e Tests", function() {
 		await tellor.removeValue(h.uintTob32(1), blocky.timestamp)
         await tellor.slashReporter(accounts[1].address, accounts[2].address)
         await h.advanceTime(86400/2/3)
-        h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x'))
+        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x'))
         await h.advanceTime(86400/2/3)
         let vars = await tellor.getStakerInfo(accounts[1].address)
         assert(vars[1] == web3.utils.toWei("20"), "should still have money staked")
@@ -85,14 +85,13 @@ describe("TellorFlex e2e Tests", function() {
         await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
         let reportingLock = await tellor.getReportingLock()
 		expect(reportingLock).to.equal(REPORTING_LOCK)
-		await h.expectThrow(tellor.connect(accounts[1]).changeReportingLock(86400)) // Only governance can change reportingLock
 		await tellor.changeReportingLock(86400)
 		reportingLock = await tellor.getReportingLock()
 		expect(reportingLock).to.equal(86400)
         await h.advanceTime(86400/2)
-        h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x'))
-        await h.advanceTime(86400/2)
-        tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
+        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x'))
+        await h.advanceTime(86420/2)
+        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
     })    
     it("Check increasing stake amount in future", async function() {
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
@@ -114,12 +113,12 @@ describe("TellorFlex e2e Tests", function() {
         await tellor.connect(accounts[2]).depositStake(web3.utils.toWei("10"))
         let count
         for(i=0;i<50;i++){
-            await tellor.connect(accounts[1]).submitValue(h.uintTob32(i+1), h.bytes(100), 0, h.bytes(i))
-            await tellor.connect(accounts[2]).submitValue(h.uintTob32(i+1), h.bytes(100), 0, h.bytes(i))
+            await tellor.connect(accounts[1]).submitValue(h.uintTob32(i+1), h.bytes(100), 0, i)
+            await tellor.connect(accounts[2]).submitValue(h.uintTob32(i+1), h.bytes(100), 0, i)
             await h.advanceTime(86400/2)
         }
         for(i=0;i<50;i++){
-            count = tellor.getNewValueCountbyQueryId(h.uintTob32(i+1))
+            count = await tellor.getNewValueCountbyQueryId(h.uintTob32(i+1))
             assert(count == 2, "new value count should be correct")
         }
         let repC1 = await tellor.getReportsSubmittedByAddress(accounts[1].address)
@@ -144,23 +143,27 @@ describe("TellorFlex e2e Tests", function() {
             await tellor.connect(accounts[i]).depositStake(web3.utils.toWei("10"))
         }
         for(i=0;i<10;i++){
-            await tellor.connect(accounts[i]).submitValue(h.uintTob32(1), h.bytes(100), 0, h.bytes("0x01"))
-            await tellor.connect(accounts[i+1]).submitValue(h.uintTob32(1), h.bytes(1000), 0, h.bytes("0x02"))
-            await tellor.connect(accounts[i+2]).submitValue(h.uintTob32(1), h.bytes(10000), 0, h.bytes("0x03"))
-            await tellor.connect(accounts[i+3]).submitValue(h.uintTob32(1), h.bytes(100000), 0, h.bytes("0x04"))
-            await tellor.connect(accounts[i+4]).submitValue(h.uintTob32(1), h.bytes(1000000), 0, h.bytes("0x05"))
+            await h.advanceTime(86400/2)
+            await tellor.connect(accounts[i]).submitValue(h.uintTob32(1), h.bytes(100), 0, "0x")
+            await tellor.connect(accounts[i+1]).submitValue(h.uintTob32(1), h.bytes(200), 0, "0x")
+            await tellor.connect(accounts[i+2]).submitValue(h.uintTob32(1), h.bytes(100), 0, "0x")
+            await tellor.connect(accounts[i+3]).submitValue(h.uintTob32(1), h.bytes(100), 0,"0x")
+            await tellor.connect(accounts[i+4]).submitValue(h.uintTob32(1), h.bytes(100), 0, "0x")
+           
         }
+        let blocky = await h.getBlock()
         await tellor.removeValue(h.uintTob32(1), blocky.timestamp)
-        await tellor.slashReporter(accounts[1].address, accounts[2].address)
+        await tellor.slashReporter(accounts[13].address, accounts[2].address)
         await tellor.connect(accounts[0]).changeGovernanceAddress(accounts[1].address)
         for(i=1;i<3;i++){
             await tellor.connect(accounts[i]).requestStakingWithdraw(web3.utils.toWei("10"))
             await h.advanceTime(60*60*24*7)
             await tellor.connect(accounts[i]).withdrawStake()
         }
-        for(i=0;i<5;i++){
-            await tellor.connect(accounts[i]).submitValue(h.uintTob32(1), h.bytes(100), 0, h.bytes("0x01"))
-            await tellor.connect(accounts[i+1]).submitValue(h.uintTob32(1), h.bytes(1000), 0, h.bytes("0x02"))
+        for(i=3;i<8;i++){
+            await tellor.connect(accounts[i]).submitValue(h.uintTob32(1), h.bytes(100), 0, "0x")
+            await tellor.connect(accounts[i+1]).submitValue(h.uintTob32(1), h.bytes(10000), 0, "0x")
+            await h.advanceTime(86400/2)
         }
     })
 })
