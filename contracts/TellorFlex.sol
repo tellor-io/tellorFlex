@@ -14,8 +14,8 @@ import "./interfaces/IERC20.sol";
 contract TellorFlex {
     IERC20 public token;
     address public governance;
-    uint256 public stakeAmount;
-    uint256 public totalStakeAmount;
+    uint256 public stakeAmount; //amount required to be a staker
+    uint256 public totalStakeAmount; //total amount of tokens locked in contract (via stake)
     uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
     uint256 public timeOfLastNewValue = block.timestamp; // time of the last new submitted value, originally set to the block timestamp
     mapping(bytes32 => Report) private reports; // mapping of query IDs to a report
@@ -112,6 +112,7 @@ contract TellorFlex {
 
     /**
      * @dev Allows a reporter to submit stake
+     * @param _amount amount of tokens to stake
      */
     function depositStake(uint256 _amount) external {
         StakeInfo storage _staker = stakerDetails[msg.sender];
@@ -152,6 +153,7 @@ contract TellorFlex {
 
     /**
      * @dev Allows a reporter to request to withdraw their stake
+     * @param _amount amount of staked tokens requesting to withdraw
      */
     function requestStakingWithdraw(uint256 _amount) external {
         StakeInfo storage _staker = stakerDetails[msg.sender];
