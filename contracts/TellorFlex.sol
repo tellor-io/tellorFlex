@@ -14,8 +14,8 @@ import "./interfaces/IERC20.sol";
 contract TellorFlex {
     IERC20 public token;
     address public governance;
-    uint256 public stakeAmount;
-    uint256 public totalStakeAmount;
+    uint256 public stakeAmount; //amount required to be a staker
+    uint256 public totalStakeAmount; //total amount of tokens locked in contract (via stake)
     uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
     uint256 public timeOfLastNewValue = block.timestamp; // time of the last new submitted value, originally set to the block timestamp
     mapping(bytes32 => Report) private reports; // mapping of query IDs to a report
@@ -112,6 +112,7 @@ contract TellorFlex {
 
     /**
      * @dev Allows a reporter to submit stake
+     * @param _amount amount of tokens to stake
      */
     function depositStake(uint256 _amount) external {
         StakeInfo storage _staker = stakerDetails[msg.sender];
@@ -138,9 +139,9 @@ contract TellorFlex {
         uint256 _index = rep.timestampIndex[_timestamp];
         require(_timestamp == rep.timestamps[_index], "Invalid value");
         // Shift all timestamps back to reflect deletion of value
-        for (uint256 i = _index; i < rep.timestamps.length - 1; i++) {
-            rep.timestamps[i] = rep.timestamps[i + 1];
-            rep.timestampIndex[rep.timestamps[i]] -= 1;
+        for (uint256 _i = _index; _i < rep.timestamps.length - 1; _i++) {
+            rep.timestamps[_i] = rep.timestamps[_i + 1];
+            rep.timestampIndex[rep.timestamps[_i]] -= 1;
         }
         // Delete and reset timestamp and value
         delete rep.timestamps[rep.timestamps.length - 1];
@@ -152,6 +153,7 @@ contract TellorFlex {
 
     /**
      * @dev Allows a reporter to request to withdraw their stake
+     * @param _amount amount of staked tokens requesting to withdraw
      */
     function requestStakingWithdraw(uint256 _amount) external {
         StakeInfo storage _staker = stakerDetails[msg.sender];
@@ -351,14 +353,6 @@ contract TellorFlex {
     }
 
     /**
-     * @dev Returns the reporting lock time, the amount of time a reporter must wait to submit again
-     * @return uint256 reporting lock time
-     */
-    function getReportingLock() external view returns (uint256) {
-        return reportingLock;
-    }
-
-    /**
      * @dev Returns the address of the reporter who submitted a value for a data ID at a specific time
      * @param _queryId is ID of the specific data feed
      * @param _timestamp is the timestamp to find a corresponding reporter for
@@ -383,6 +377,14 @@ contract TellorFlex {
         returns (uint256)
     {
         return stakerDetails[_reporter].reporterLastTimestamp;
+    }
+
+    /**
+     * @dev Returns the reporting lock time, the amount of time a reporter must wait to submit again
+     * @return uint256 reporting lock time
+     */
+    function getReportingLock() external view returns (uint256) {
+        return reportingLock;
     }
 
     /**
@@ -485,19 +487,19 @@ contract TellorFlex {
     }
 
     /**
-     * @dev Returns total amount of token staked for reporting
-     * @return uint256 total amount of token staked
-     */
-    function getTotalStakeAmount() external view returns (uint256) {
-        return totalStakeAmount;
-    }
-
-    /**
      * @dev Returns the address of the token used for staking
      * @return address of the token used for staking
      */
     function getTokenAddress() external view returns (address) {
         return address(token);
+    }
+
+    /**
+     * @dev Returns total amount of token staked for reporting
+     * @return uint256 total amount of token staked
+     */
+    function getTotalStakeAmount() external view returns (uint256) {
+        return totalStakeAmount;
     }
 
     /**
