@@ -79,6 +79,7 @@ describe("TellorFlex", function() {
 		expect(stakerDetails[2]).to.equal(0)
 		expect(stakerDetails[3]).to.equal(0)
 		expect(stakerDetails[4]).to.equal(0)
+		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("10"))
 	})
 
 	it("removeValue", async function() {
@@ -87,6 +88,7 @@ describe("TellorFlex", function() {
 		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
 		let blocky = await h.getBlock()
 		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(1)
+		await h.expectThrow(tellor.removeValue(QUERYID1, 500)) // invalid value
 		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.bytes(100))
 		await h.expectThrow(tellor.connect(accounts[1]).removeValue(QUERYID1, blocky.timestamp)) // only gov can removeValue
 		await tellor.removeValue(QUERYID1, blocky.timestamp)
