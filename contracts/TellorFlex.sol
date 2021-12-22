@@ -74,6 +74,8 @@ contract TellorFlex {
         uint256 _stakeAmount,
         uint256 _reportingLock
     ) {
+        require(_token != address(0), "must set token address");
+        require(_governance != address(0), "must set governance address");
         token = IERC20(_token);
         governance = _governance;
         stakeAmount = _stakeAmount;
@@ -86,6 +88,7 @@ contract TellorFlex {
      */
     function changeGovernanceAddress(address _newGovernanceAddress) external {
         require(msg.sender == governance, "caller must be governance address");
+        require(_newGovernanceAddress != address(0), "must set governance address");
         governance = _newGovernanceAddress;
         emit NewGovernanceAddress(_newGovernanceAddress);
     }
@@ -96,6 +99,7 @@ contract TellorFlex {
      */
     function changeReportingLock(uint256 _newReportingLock) external {
         require(msg.sender == governance, "caller must be governance address");
+        require(_newReportingLock > 0, "reporting lock must be greater than zero");
         reportingLock = _newReportingLock;
         emit NewReportingLock(_newReportingLock);
     }
@@ -106,6 +110,7 @@ contract TellorFlex {
      */
     function changeStakeAmount(uint256 _newStakeAmount) external {
         require(msg.sender == governance, "caller must be governance address");
+        require(_newStakeAmount > 0, "stake amount must be greater than zero");
         stakeAmount = _newStakeAmount;
         emit NewStakeAmount(_newStakeAmount);
     }
@@ -137,7 +142,7 @@ contract TellorFlex {
         require(msg.sender == governance, "caller must be governance address");
         Report storage rep = reports[_queryId];
         uint256 _index = rep.timestampIndex[_timestamp];
-        require(_timestamp == rep.timestamps[_index], "Invalid value");
+        require(_timestamp == rep.timestamps[_index], "invalid timestamp");
         // Shift all timestamps back to reflect deletion of value
         for (uint256 _i = _index; _i < rep.timestamps.length - 1; _i++) {
             rep.timestamps[_i] = rep.timestamps[_i + 1];
@@ -159,7 +164,7 @@ contract TellorFlex {
         StakeInfo storage _staker = stakerDetails[msg.sender];
         require(
             _staker.stakedBalance >= _amount,
-            "Insufficient staked balance"
+            "insufficient staked balance"
         );
         _staker.startDate = block.timestamp;
         _staker.lockedBalance += _amount;
@@ -179,11 +184,11 @@ contract TellorFlex {
         external
         returns (uint256)
     {
-        require(msg.sender == governance, "Only governance can slash reporter");
+        require(msg.sender == governance, "only governance can slash reporter");
         StakeInfo storage _staker = stakerDetails[_reporter];
         require(
             _staker.stakedBalance + _staker.lockedBalance > 0,
-            "Zero staker balance"
+            "zero staker balance"
         );
         uint256 _slashAmount;
         if (_staker.lockedBalance >= stakeAmount) {
@@ -273,7 +278,7 @@ contract TellorFlex {
         StakeInfo storage _s = stakerDetails[msg.sender];
         // Ensure reporter is locked and that enough time has passed
         require(block.timestamp - _s.startDate >= 7 days, "7 days didn't pass");
-        require(_s.lockedBalance > 0, "Reporter not locked for withdrawal");
+        require(_s.lockedBalance > 0, "reporter not locked for withdrawal");
         token.transfer(msg.sender, _s.lockedBalance);
         _s.lockedBalance = 0;
         emit StakeWithdrawn(msg.sender);
