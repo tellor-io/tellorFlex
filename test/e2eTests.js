@@ -68,7 +68,7 @@ describe("TellorFlex e2e Tests", function() {
         await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
         await h.advanceTime(86400/4 + 10)
         h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(102), 1, '0x'))
-		await tellor.connect(accounts[0]).changeStakeAmount(web3.utils.toWei("5")) 
+		await tellor.connect(accounts[0]).changeStakeAmount(web3.utils.toWei("5"))
         await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(102), 1, '0x')
     })
     it("Bad value placed, withdraw requested, dispute started", async function() {
@@ -79,7 +79,7 @@ describe("TellorFlex e2e Tests", function() {
         await tellor.removeValue(h.uintTob32(1), blocky.timestamp)
         await tellor.slashReporter(accounts[1].address, accounts[2].address)
 		await h.expectThrow(tellor.connect(accounts[1]).withdrawStake()) // 7 days didn't pass
-    })    
+    })
     it("Increase reporter lock time", async function() {
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
         await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
@@ -92,7 +92,7 @@ describe("TellorFlex e2e Tests", function() {
         await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x'))
         await h.advanceTime(86420/2)
         await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
-    })    
+    })
     it("Check increasing stake amount in future", async function() {
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
         await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
@@ -105,7 +105,7 @@ describe("TellorFlex e2e Tests", function() {
         h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x'))
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("990"))
         await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x')
-    })    
+    })
     it("Mine 2 values on 50 different ID's", async function() {
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
         await token.mint(accounts[2].address, web3.utils.toWei("1000"));
@@ -125,17 +125,17 @@ describe("TellorFlex e2e Tests", function() {
         let repC2 = await tellor.getReportsSubmittedByAddress(accounts[2].address)
         assert(repC1 == 50, "reporter count 1 should be correct")
         assert(repC2 == 50, "reporter 2 count should be correct")
-    })   
+    })
     it("Decrease reporter lock time", async function() {
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
         await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
         await h.advanceTime(86400/4)
-        h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x'))
+        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x'))
         let reportingLock = await tellor.getReportingLock()
 		expect(reportingLock).to.equal(REPORTING_LOCK)
 		await tellor.changeReportingLock(86400/4)
         await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x')
-    })      
+    })
     it("Realistic test (actual variables we'll use)", async function() {
         for(i=0;i<20;i++){
             await token.mint(accounts[i].address, web3.utils.toWei("1000"));
@@ -149,7 +149,7 @@ describe("TellorFlex e2e Tests", function() {
             await tellor.connect(accounts[i+2]).submitValue(h.uintTob32(1), h.bytes(100), 0, "0x")
             await tellor.connect(accounts[i+3]).submitValue(h.uintTob32(1), h.bytes(100), 0,"0x")
             await tellor.connect(accounts[i+4]).submitValue(h.uintTob32(1), h.bytes(100), 0, "0x")
-           
+
         }
         let blocky = await h.getBlock()
         await tellor.removeValue(h.uintTob32(1), blocky.timestamp)
