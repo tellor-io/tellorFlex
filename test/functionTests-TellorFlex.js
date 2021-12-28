@@ -80,6 +80,13 @@ describe("TellorFlex", function() {
 		expect(stakerDetails[3]).to.equal(0)
 		expect(stakerDetails[4]).to.equal(0)
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("10"))
+		await tellor.connect(accounts[1]).requestStakingWithdraw(h.toWei("5"))
+		await tellor.connect(accounts[1]).depositStake(h.toWei("10"))
+		expect(await token.balanceOf(accounts[1].address)).to.equal(web3.utils.toWei("985"))
+		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
+		expect(stakerDetails[1]).to.equal(web3.utils.toWei("15"))
+		expect(stakerDetails[2]).to.equal(0)
+		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("15"))
 	})
 
 	it("removeValue", async function() {

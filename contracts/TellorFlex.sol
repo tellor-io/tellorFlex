@@ -88,7 +88,10 @@ contract TellorFlex {
      */
     function changeGovernanceAddress(address _newGovernanceAddress) external {
         require(msg.sender == governance, "caller must be governance address");
-        require(_newGovernanceAddress != address(0), "must set governance address");
+        require(
+            _newGovernanceAddress != address(0),
+            "must set governance address"
+        );
         governance = _newGovernanceAddress;
         emit NewGovernanceAddress(_newGovernanceAddress);
     }
@@ -99,7 +102,10 @@ contract TellorFlex {
      */
     function changeReportingLock(uint256 _newReportingLock) external {
         require(msg.sender == governance, "caller must be governance address");
-        require(_newReportingLock > 0, "reporting lock must be greater than zero");
+        require(
+            _newReportingLock > 0,
+            "reporting lock must be greater than zero"
+        );
         reportingLock = _newReportingLock;
         emit NewReportingLock(_newReportingLock);
     }
@@ -121,8 +127,19 @@ contract TellorFlex {
      */
     function depositStake(uint256 _amount) external {
         StakeInfo storage _staker = stakerDetails[msg.sender];
-        if (_staker.lockedBalance >= _amount) {
-            _staker.lockedBalance -= _amount;
+        if (_staker.lockedBalance > 0) {
+            if (_staker.lockedBalance >= _amount) {
+                _staker.lockedBalance -= _amount;
+            } else {
+                require(
+                    token.transferFrom(
+                        msg.sender,
+                        address(this),
+                        _amount - _staker.lockedBalance
+                    )
+                );
+                _staker.lockedBalance = 0;
+            }
         } else {
             require(token.transferFrom(msg.sender, address(this), _amount));
         }
