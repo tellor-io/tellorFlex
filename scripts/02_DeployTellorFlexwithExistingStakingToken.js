@@ -12,7 +12,7 @@ const web3 = require('web3');
 
 var stake_amt = web3.utils.toWei("10");
 var rep_lock = 43200; // 12 hours
-var stakerTokenAdd= '0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0'
+var stakerTokenAdd= '0x002e861910d7f87baa832a22ac436f25fb66fa24'
 var governanceAddress = '0x20bEC8F31dea6C13A016DC7fCBdF74f61DC8Ec2c'
 
 
@@ -37,15 +37,37 @@ async function deployTellorFlex(_network, _pk, _nodeURL, stakerToken, govAdd, st
     const tellor = await tellorFwithsigner.deploy(stakerToken, govAdd, stakeAmount, reporterLock)
     await tellor.deployed();
 
-    if (net == "mainnet") {
-        console.log("TellorFlex contract deployed to:", "https://etherscan.io/address/" + tellor.address);
-        console.log("    TellorFlex transaction hash:", "https://etherscan.io/tx/" + tellor.deployTransaction.hash);
+    if (net == "mainnet"){
+        console.log("Tellor contract deployed to:", "https://etherscan.io/address/" + tellor.address);
+        console.log("    transaction hash:", "https://etherscan.io/tx/" + tellor.deployTransaction.hash);
     } else if (net == "rinkeby") {
-        console.log("TellorFlex contract deployed to:", "https://rinkeby.etherscan.io/address/" + tellor.address);
-        console.log("    TellorFlex transaction hash:", "https://rinkeby.etherscan.io/tx/" + tellor.deployTransaction.hash);
+        console.log("Tellor contract deployed to:", "https://rinkeby.etherscan.io/address/" + tellor.address);
+        console.log("    transaction hash:", "https://rinkeby.etherscan.io/tx/" + tellor.deployTransaction.hash);
+    } else if (net == "bsc_testnet") {
+        console.log("Tellor contract deployed to:", "https://testnet.bscscan.com/address/" + tellor.address);
+        console.log("    transaction hash:", "https://testnet.bscscan.com/tx/" + tellor.deployTransaction.hash);
+    } else if (net == "bsc") {
+        console.log("Tellor contract deployed to:", "https://bscscan.com/address/" + tellor.address);
+        console.log("    transaction hash:", "https://bscscan.com/tx/" + tellor.deployTransaction.hash);
+    } else if (net == "polygon") {
+        console.log("Tellor contract deployed to:", "https://explorer-mainnet.maticvigil.com/" + tellor.address);
+        console.log("    transaction hash:", "https://explorer-mainnet.maticvigil.com/tx/" + tellor.deployTransaction.hash);
+    } else if (net == "polygon_testnet") {
+        console.log("Tellor contract deployed to:", "https://explorer-mumbai.maticvigil.com/" + tellor.address);
+        console.log("    transaction hash:", "https://explorer-mumbai.maticvigil.com/tx/" + tellor.deployTransaction.hash);
+    } else if (net == "arbitrum_testnet"){
+        console.log("tellor contract deployed to:","https://rinkeby-explorer.arbitrum.io/#/"+ tellor.address)
+        console.log("    transaction hash:", "https://rinkeby-explorer.arbitrum.io/#/tx/" + tellor.deployTransaction.hash);
+    }  else if (net == "xdaiSokol"){ //https://blockscout.com/poa/xdai/address/
+      console.log("tellor contract deployed to:","https://blockscout.com/poa/sokol/address/"+ tellor.address)
+      console.log("    transaction hash:", "https://blockscout.com/poa/sokol/tx/" + tellor.deployTransaction.hash);
+    } else if (net == "xdai"){ //https://blockscout.com/poa/xdai/address/
+      console.log("tellor contract deployed to:","https://blockscout.com/xdai/mainnet/address/"+ tellor.address)
+      console.log("    transaction hash:", "https://blockscout.com/xdai/mainnet/tx/" + tellor.deployTransaction.hash);
     } else {
         console.log("Please add network explorer details")
     }
+
 
     // Wait for few confirmed transactions.
     // Otherwise the etherscan api doesn't find the deployed contract.
@@ -57,7 +79,7 @@ async function deployTellorFlex(_network, _pk, _nodeURL, stakerToken, govAdd, st
     await run("verify:verify",
         {
             address: tellor.address,
-            constructorArguments: [stakerToken, govAdd, stakeAmount, reporterLock] 
+            constructorArguments: [stakerToken, govAdd, stakeAmount, reporterLock]
         },
     )
 
@@ -72,4 +94,3 @@ deployTellorFlex("rinkeby", process.env.TESTNET_PK, process.env.NODE_URL_RINKEBY
         console.error(error);
         process.exit(1);
     });
-
