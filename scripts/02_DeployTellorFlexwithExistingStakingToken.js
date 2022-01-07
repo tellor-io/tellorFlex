@@ -13,7 +13,7 @@ const web3 = require('web3');
 var stake_amt = web3.utils.toWei("10");
 var rep_lock = 43200; // 12 hours
 var stakerTokenAdd= '0x002e861910d7f87baa832a22ac436f25fb66fa24'
-var governanceAddress = '0x20bEC8F31dea6C13A016DC7fCBdF74f61DC8Ec2c'
+var governanceAddress = '0x0Fe623d889Ad1c599E5fF3076A57D1D4F2448CDe'
 
 
 async function deployTellorFlex(_network, _pk, _nodeURL, stakerToken, govAdd, stakeAmount, reporterLock) {
@@ -88,7 +88,7 @@ async function deployTellorFlex(_network, _pk, _nodeURL, stakerToken, govAdd, st
 }
 
 
-deployTellorFlex("rinkeby", process.env.TESTNET_PK, process.env.NODE_URL_RINKEBY,stakerTokenAdd,governanceAddress,stake_amt,rep_lock)
+deployTellorFlex("polygon_testnet", process.env.TESTNET_PK, process.env.NODE_URL_MUMBAI,stakerTokenAdd,governanceAddress,stake_amt,rep_lock)
     .then(() => process.exit(0))
     .catch(error => {
         console.error(error);

@@ -47,7 +47,7 @@ require("dotenv").config();
         url: "https://eth-mainnet.alchemyapi.io/v2/7dW8KCqWwKa1vdaitq-SxmKfxWZ4yPG6"
       },
       allowUnlimitedContractSize: true
-     },
+    }//,
     // rinkeby: {
     //      url: `${process.env.NODE_URL_RINKEBY}`,
     //      seeds: [process.env.PRIVATE_KEY],
@@ -60,12 +60,12 @@ require("dotenv").config();
     //      gas: 3000000 ,
     //      gasPrice: 300000000000
     //    }
-    polygon_testnet: {
-        url: `${process.env.NODE_URL_MUMBAI}`,
-        accounts: [process.env.TESTNET_PK],
-        gas: 10000000 ,
-        gasPrice: 50000000000
-      }
+    // polygon_testnet: {
+    //     url: `${process.env.NODE_URL_MUMBAI}`,
+    //     accounts: [process.env.TESTNET_PK],
+    //     gas: 10000000 ,
+    //     gasPrice: 50000000000
+    //   }
   },
   etherscan: {
     // Your API key for Etherscan
