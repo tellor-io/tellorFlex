@@ -4,7 +4,7 @@
 
 <b>TellorFlex</b> is the main Tellor contract for the non-Ethereum chains.  The functions for the oracle contract are almost identical, but the token contracts have been abstracted away. 
 
-For more indepth information about Tellor checkout our [documenation](https://docs.tellor.io/tellor/), [whitepaper](https://docs.tellor.io/tellor/whitepaper/introduction) and [website](https://tellor.io/).
+For more in-depth information about Tellor checkout our [documentation](https://docs.tellor.io/tellor/), [whitepaper](https://docs.tellor.io/tellor/whitepaper/introduction) and [website](https://tellor.io/).
 
 Quick references are included below:
 
