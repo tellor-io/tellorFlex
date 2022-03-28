@@ -40,6 +40,12 @@ async function deployTellorFlex(_network, _pk, _nodeURL,  govAdd, stakeAmount, r
     } else if (net == "rinkeby") {
         console.log("stakingToken contract deployed to:", "https://rinkeby.etherscan.io/address/" + st.address);
         console.log("    stakingToken transaction hash:", "https://rinkeby.etherscan.io/tx/" + st.deployTransaction.hash);
+    } else if (net == "harmony_testnet") {
+        console.log("stakingToken contract deployed to:", "https://explorer.pops.one/address/" + st.address);
+        console.log("    stakingToken transaction hash:", "https://explorer.pops.one/tx/" + st.deployTransaction.hash);
+    } else if (net == "harmony_mainnet") {
+        console.log("stakingToken contract deployed to:", "https://explorer.harmony.one/address/" + st.address);
+        console.log("    stakingToken transaction hash:", "https://explorer.harmony.one/tx/" + st.deployTransaction.hash);
     } else {
         console.log("Please add network explorer details")
     }
@@ -49,16 +55,16 @@ async function deployTellorFlex(_network, _pk, _nodeURL,  govAdd, stakeAmount, r
     console.log('waiting for stakingToken tx confirmation...');
     await st.deployTransaction.wait(7)
 
-    console.log('submitting stakingToken contract for verification...');
+    // console.log('submitting stakingToken contract for verification...');
 
-    await run("verify:verify",
-        {
-            address: st.address
+    // await run("verify:verify",
+    //     {
+    //         address: st.address
              
-        },
-    )
+    //     },
+    // )
 
-    console.log("TellorFlex contract verified")
+    // console.log("TellorFlex contract verified")
 
     /////////// Deploy Tellor flex
     console.log("deploy tellor flex")
@@ -77,6 +83,12 @@ async function deployTellorFlex(_network, _pk, _nodeURL,  govAdd, stakeAmount, r
     } else if (net == "rinkeby") {
         console.log("TellorFlex contract deployed to:", "https://rinkeby.etherscan.io/address/" + tellor.address);
         console.log("    TellorFlex transaction hash:", "https://rinkeby.etherscan.io/tx/" + tellor.deployTransaction.hash);
+    } else if (net == "harmony_testnet") {
+        console.log("stakingToken contract deployed to:", "https://explorer.pops.one/address/" + st.address);
+        console.log("    stakingToken transaction hash:", "https://explorer.pops.one/tx/" + st.deployTransaction.hash);
+    } else if (net == "harmony_mainnet") {
+        console.log("stakingToken contract deployed to:", "https://explorer.harmony.one/address/" + st.address);
+        console.log("    stakingToken transaction hash:", "https://explorer.harmony.one/tx/" + st.deployTransaction.hash);
     } else {
         console.log("Please add network explorer details")
     }
@@ -86,21 +98,27 @@ async function deployTellorFlex(_network, _pk, _nodeURL,  govAdd, stakeAmount, r
     console.log('waiting for TellorFlex tx confirmation...');
     await tellor.deployTransaction.wait(7)
 
-    console.log('submitting TellorFlex contract for verification...');
+    // console.log('submitting TellorFlex contract for verification...');
 
-    await run("verify:verify",
-        {
-            address: tellor.address,
-            constructorArguments: [st.address, govAdd, stakeAmount, reporterLock] 
-        },
-    )
+    // await run("verify:verify",
+    //     {
+    //         address: tellor.address,
+    //         constructorArguments: [st.address, govAdd, stakeAmount, reporterLock] 
+    //     },
+    // )
 
-    console.log("TellorFlex contract verified")
+    // console.log("TellorFlex contract verified")
 
 }
 
 
-deployTellorFlex("rinkeby", process.env.TESTNET_PK, process.env.NODE_URL_RINKEBY,governanceAddress,stake_amt,rep_lock)
+// deployTellorFlex("harmony_testnet", process.env.TESTNET_PK, process.env.NODE_URL_HARMONY_TESTNET,governanceAddress,stake_amt,rep_lock)
+//     .then(() => process.exit(0))
+//     .catch(error => {
+//         console.error(error);
+//         process.exit(1);
+//     });
+deployTellorFlex("harmony_mainnet", process.env.MAINNET_PK, process.env.NODE_URL_HARMONY_MAINNET,governanceAddress,stake_amt,rep_lock)
     .then(() => process.exit(0))
     .catch(error => {
         console.error(error);

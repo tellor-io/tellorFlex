@@ -12,7 +12,8 @@ const web3 = require('web3');
 
 var stake_amt = web3.utils.toWei("10");
 var rep_lock = 43200; // 12 hours
-var stakerTokenAdd= '0x002e861910d7f87baa832a22ac436f25fb66fa24'
+// var stakerTokenAdd= '0x002e861910d7f87baa832a22ac436f25fb66fa24'
+var stakerTokenAdd= '0x9ff6799d07cbc824ec16cf5fe7bdc6798849e9cc' // harmony testnet TRB address
 var governanceAddress = '0x0Fe623d889Ad1c599E5fF3076A57D1D4F2448CDe'
 
 
@@ -43,6 +44,9 @@ async function deployTellorFlex(_network, _pk, _nodeURL, stakerToken, govAdd, st
     } else if (net == "rinkeby") {
         console.log("Tellor contract deployed to:", "https://rinkeby.etherscan.io/address/" + tellor.address);
         console.log("    transaction hash:", "https://rinkeby.etherscan.io/tx/" + tellor.deployTransaction.hash);
+    } else if (net == "harmony_testnet") {
+        console.log("Tellor contract deployed to:", "https://explorer.pops.one/address/" + tellor.address);
+        console.log("    transaction hash:", "https://explorer.pops.one/tx/" + tellor.deployTransaction.hash);
     } else if (net == "bsc_testnet") {
         console.log("Tellor contract deployed to:", "https://testnet.bscscan.com/address/" + tellor.address);
         console.log("    transaction hash:", "https://testnet.bscscan.com/tx/" + tellor.deployTransaction.hash);
@@ -88,7 +92,7 @@ async function deployTellorFlex(_network, _pk, _nodeURL, stakerToken, govAdd, st
 }
 
 
-deployTellorFlex("polygon_testnet", process.env.TESTNET_PK, process.env.NODE_URL_MUMBAI,stakerTokenAdd,governanceAddress,stake_amt,rep_lock)
+deployTellorFlex("harmony_testnet", process.env.TESTNET_PK, process.env.NODE_URL_HARMONY_TESTNET,stakerTokenAdd,governanceAddress,stake_amt,rep_lock)
     .then(() => process.exit(0))
     .catch(error => {
         console.error(error);
