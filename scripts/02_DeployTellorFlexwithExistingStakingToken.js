@@ -95,15 +95,15 @@ async function deployTellorFlex(_network, _pk, _nodeURL, stakerToken, govAdd, st
 }
 
 
-// deployTellorFlex("harmony_testnet", process.env.TESTNET_PK, process.env.NODE_URL_HARMONY_TESTNET,stakerTokenAdd,governanceAddress,stake_amt,rep_lock)
-//     .then(() => process.exit(0))
-//     .catch(error => {
-//         console.error(error);
-//         process.exit(1);
-//     });
-deployTellorFlex("harmony_mainnet", process.env.MAINNET_PK, process.env.NODE_URL_HARMONY_MAINNET,stakerTokenAdd,governanceAddress,stake_amt,rep_lock)
+deployTellorFlex("harmony_testnet", process.env.TESTNET_PK, process.env.NODE_URL_HARMONY_TESTNET,stakerTokenAdd,governanceAddress,stake_amt,rep_lock)
     .then(() => process.exit(0))
     .catch(error => {
         console.error(error);
         process.exit(1);
     });
+// deployTellorFlex("harmony_mainnet", process.env.MAINNET_PK, process.env.NODE_URL_HARMONY_MAINNET,stakerTokenAdd,governanceAddress,stake_amt,rep_lock)
+//     .then(() => process.exit(0))
+//     .catch(error => {
+//         console.error(error);
+//         process.exit(1);
+//     });
