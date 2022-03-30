@@ -47,6 +47,9 @@ async function deployTellorFlex(_network, _pk, _nodeURL, stakerToken, govAdd, st
     } else if (net == "harmony_testnet") {
         console.log("Tellor contract deployed to:", "https://explorer.pops.one/address/" + tellor.address);
         console.log("    transaction hash:", "https://explorer.pops.one/tx/" + tellor.deployTransaction.hash);
+    } else if (net == "harmony_mainnet") {
+        console.log("Tellor contract deployed to:", "https://explorer.harmony.one/address/" + tellor.address);
+        console.log("    transaction hash:", "https://explorer.harmony.one/tx/" + tellor.deployTransaction.hash);
     } else if (net == "bsc_testnet") {
         console.log("Tellor contract deployed to:", "https://testnet.bscscan.com/address/" + tellor.address);
         console.log("    transaction hash:", "https://testnet.bscscan.com/tx/" + tellor.deployTransaction.hash);
@@ -98,3 +101,9 @@ deployTellorFlex("harmony_testnet", process.env.TESTNET_PK, process.env.NODE_URL
         console.error(error);
         process.exit(1);
     });
+// deployTellorFlex("harmony_mainnet", process.env.MAINNET_PK, process.env.NODE_URL_HARMONY_MAINNET,stakerTokenAdd,governanceAddress,stake_amt,rep_lock)
+//     .then(() => process.exit(0))
+//     .catch(error => {
+//         console.error(error);
+//         process.exit(1);
+//     });
