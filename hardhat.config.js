@@ -78,11 +78,17 @@ require("dotenv").config();
       //   gas: 10000000 ,
       //   gasPrice: 50000000000
       // }
+    // arbitrum_testnet: {
+    //   url: `${process.env.NODE_URL_ARBITRUM_TESTNET}`,
+    //   accounts: [process.env.TESTNET_PK],
+    //   gas: 10000000 ,
+    //   gasPrice: 50000000000
+    // }
   },
   etherscan: {
     // Your API key for Etherscan
     // Obtain one at https://etherscan.io/
-    apiKey: process.env.POLYGONSCAN
+    apiKey: process.env.ETHERSCAN
   },
 
   contractSizer: {

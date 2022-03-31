@@ -9,6 +9,7 @@ const web3 = require('web3');
 
 //const dotenv = require('dotenv').config()
 //npx hardhat run scripts/01_DeployTellorFlexwithtestStakingToken.js --network rinkeby
+//npx hardhat run scripts/02_DeployTellorFlexwithExistingStakingToken.js --network arbitrum_testnet
 
 var stake_amt = web3.utils.toWei("10");
 var rep_lock = 43200; // 12 hours
@@ -46,6 +47,9 @@ async function deployTellorFlex(_network, _pk, _nodeURL,  govAdd, stakeAmount, r
     } else if (net == "harmony_mainnet") {
         console.log("stakingToken contract deployed to:", "https://explorer.harmony.one/address/" + st.address);
         console.log("    stakingToken transaction hash:", "https://explorer.harmony.one/tx/" + st.deployTransaction.hash);
+    } else if (net == "arbitrum_testnet") {
+        console.log("stakingToken contract deployed to:", "https://rinkeby-explorer.arbitrum.io/address/" + st.address);
+        console.log("    stakingToken transaction hash:", "https://rinkeby-explorer.arbitrum.io/tx/" + st.deployTransaction.hash);
     } else {
         console.log("Please add network explorer details")
     }
@@ -89,6 +93,9 @@ async function deployTellorFlex(_network, _pk, _nodeURL,  govAdd, stakeAmount, r
     } else if (net == "harmony_mainnet") {
         console.log("stakingToken contract deployed to:", "https://explorer.harmony.one/address/" + st.address);
         console.log("    stakingToken transaction hash:", "https://explorer.harmony.one/tx/" + st.deployTransaction.hash);
+    } else if (net == "arbitrum_testnet") {
+        console.log("stakingToken contract deployed to:", "https://rinkeby-explorer.arbitrum.io/address/" + st.address);
+        console.log("    stakingToken transaction hash:", "https://rinkeby-explorer.arbitrum.io/tx/" + st.deployTransaction.hash);
     } else {
         console.log("Please add network explorer details")
     }
@@ -112,16 +119,9 @@ async function deployTellorFlex(_network, _pk, _nodeURL,  govAdd, stakeAmount, r
 }
 
 
-deployTellorFlex("harmony_testnet", process.env.TESTNET_PK, process.env.NODE_URL_HARMONY_TESTNET,governanceAddress,stake_amt,rep_lock)
+deployTellorFlex("arbitrum_testnet", process.env.TESTNET_PK, process.env.NODE_URL_ARBITRUM_TESTNET,governanceAddress,stake_amt,rep_lock)
     .then(() => process.exit(0))
     .catch(error => {
         console.error(error);
         process.exit(1);
     });
-// deployTellorFlex("harmony_mainnet", process.env.MAINNET_PK, process.env.NODE_URL_HARMONY_MAINNET,governanceAddress,stake_amt,rep_lock)
-//     .then(() => process.exit(0))
-//     .catch(error => {
-//         console.error(error);
-//         process.exit(1);
-//     });
-
