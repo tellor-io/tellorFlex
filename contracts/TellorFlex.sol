@@ -2,6 +2,7 @@
 pragma solidity 0.8.3;
 
 import "./interfaces/IERC20.sol";
+import "./interfaces/IGovernance.sol";
 
 /**
  @author Tellor Inc.
@@ -18,6 +19,12 @@ contract TellorFlex {
     uint256 public totalStakeAmount; //total amount of tokens locked in contract (via stake)
     uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
     uint256 public timeOfLastNewValue = block.timestamp; // time of the last new submitted value, originally set to the block timestamp
+    uint256 public rewardRate;
+    uint256 public accumulatedRewardPerShare;
+    uint256 public timeLastAllocation;
+    uint256 public totalRewardDebt;
+    uint256 public stakingRewardsBalance;
+
     mapping(bytes32 => Report) private reports; // mapping of query IDs to a report
     mapping(address => StakeInfo) stakerDetails; //mapping from a persons address to their staking info
 
@@ -34,8 +41,11 @@ contract TellorFlex {
         uint256 startDate; //stake start date
         uint256 stakedBalance; // staked balance
         uint256 lockedBalance; // amount locked for withdrawal
+        uint256 rewardDebt; // used for reward calculation
         uint256 reporterLastTimestamp; // timestamp of reporter's last reported value
         uint256 reportsSubmitted; // total number of reports submitted by reporter
+        uint256 startVoteCount; // total number of governance votes when stake deposited
+        uint256 voteTally; // number of votes cast by staker since last reset
         mapping(bytes32 => uint256) reportsSubmittedByQueryId;
     }
 
@@ -81,6 +91,59 @@ contract TellorFlex {
         stakeAmount = _stakeAmount;
         reportingLock = _reportingLock;
     }
+
+    function updateRewards() public {
+        if(timeLastAllocation == block.timestamp) {
+            return;
+        }
+        if(totalStakeAmount == 0) {
+            timeLastAllocation = block.timestamp;
+            return;
+        }
+        uint256 _newAccumulatedRewardPerShare = accumulatedRewardPerShare + (block.timestamp - timeLastAllocation) * rewardRate * 1e18 / totalStakeAmount;
+        uint256 _accumulatedReward = _newAccumulatedRewardPerShare * totalStakeAmount - totalRewardDebt;
+        if (_accumulatedReward >= stakingRewardsBalance) {
+            accumulatedRewardPerShare += (stakingRewardsBalance - (accumulatedRewardPerShare * totalStakeAmount - totalRewardDebt)) * 1e18 / totalStakeAmount;
+            rewardRate = 0; 
+        } else {
+            accumulatedRewardPerShare = _newAccumulatedRewardPerShare;
+        }
+        // accumulatedRewardPerShare += (block.timestamp - timeLastAllocation) * rewardRate * 1e18 / totalStakeAmount;
+        timeLastAllocation = block.timestamp;
+    }
+
+    function increaseVoteTally(address _voter) external {
+        require(msg.sender == governance, "caller must be governance address");
+        stakerDetails[_voter].voteTally++;
+    }
+
+    function _updateStakeAndPayRewards(address _stakerAddress, uint256 _newStakedBalance) internal {
+        updateRewards();
+        StakeInfo storage _staker = stakerDetails[_stakerAddress];
+        if(_staker.stakedBalance > 0) {
+            uint256 _pendingReward = _staker.stakedBalance * accumulatedRewardPerShare / 1e18 - _staker.rewardDebt;
+            // uint256 _numberOfVotes = IGovernance(governance).getVoteCount() - _staker.startVoteCount;
+            uint256 _numberOfVotes = 0; // NOTE: UNCOMMENT ABOVE LINE AND REMOVE THIS LINE
+            if(_numberOfVotes > 0) {
+                _pendingReward = _pendingReward * _staker.voteTally / _numberOfVotes;
+            }
+            stakingRewardsBalance -= _pendingReward;
+            token.transfer(msg.sender, _pendingReward);
+            totalRewardDebt -= _staker.rewardDebt;
+            totalStakeAmount -= _staker.stakedBalance;
+        }
+        _staker.stakedBalance = _newStakedBalance;
+        _staker.rewardDebt = _staker.stakedBalance * accumulatedRewardPerShare / 1e18;
+        totalRewardDebt += _staker.rewardDebt;
+        totalStakeAmount += _staker.stakedBalance;
+    }
+
+    function addStakingRewards(uint256 _amount) external {
+        require(token.transferFrom(msg.sender, address(this), _amount));
+        updateRewards();
+        stakingRewardsBalance += _amount;
+        rewardRate = (stakingRewardsBalance - (accumulatedRewardPerShare * totalStakeAmount - totalRewardDebt)) / 30 days;
+    }    
 
     /**
      * @dev Changes governance address
@@ -143,9 +206,8 @@ contract TellorFlex {
         } else {
             require(token.transferFrom(msg.sender, address(this), _amount));
         }
+        _updateStakeAndPayRewards(msg.sender, _staker.stakedBalance + _amount);
         _staker.startDate = block.timestamp; // This resets their stake start date to now
-        _staker.stakedBalance += _amount;
-        totalStakeAmount += _amount;
         emit NewStaker(msg.sender, _amount);
     }
 
@@ -183,10 +245,12 @@ contract TellorFlex {
             _staker.stakedBalance >= _amount,
             "insufficient staked balance"
         );
+        _updateStakeAndPayRewards(msg.sender, _staker.stakedBalance - _amount);
         _staker.startDate = block.timestamp;
         _staker.lockedBalance += _amount;
-        _staker.stakedBalance -= _amount;
-        totalStakeAmount -= _amount;
+        // _staker.stakedBalance -= _amount;
+        // totalStakeAmount -= _amount;
+        //  _staker.rewardDebt = _staker.stakedBalance * accumulatedRewardPerShare / 1e18;
         emit StakeWithdrawRequested(msg.sender, _amount);
     }
 
@@ -215,13 +279,15 @@ contract TellorFlex {
             _staker.lockedBalance + _staker.stakedBalance >= stakeAmount
         ) {
             _slashAmount = stakeAmount;
-            _staker.stakedBalance -= stakeAmount - _staker.lockedBalance;
-            totalStakeAmount -= stakeAmount - _staker.lockedBalance;
+            _updateStakeAndPayRewards(_reporter, _staker.stakedBalance - (stakeAmount - _staker.lockedBalance));
+            // _staker.stakedBalance -= stakeAmount - _staker.lockedBalance;
+            // totalStakeAmount -= stakeAmount - _staker.lockedBalance;
             _staker.lockedBalance = 0;
         } else {
             _slashAmount = _staker.stakedBalance + _staker.lockedBalance;
-            totalStakeAmount -= _staker.stakedBalance;
-            _staker.stakedBalance = 0;
+            _updateStakeAndPayRewards(_reporter, 0);
+            // totalStakeAmount -= _staker.stakedBalance;
+            // _staker.stakedBalance = 0;
             _staker.lockedBalance = 0;
         }
         token.transfer(_recipient, _slashAmount);
