@@ -92,7 +92,7 @@ contract TellorFlex {
         reportingLock = _reportingLock;
     }
 
-    function updateRewards() public {
+    function _updateRewards() internal {
         if(timeLastAllocation == block.timestamp) {
             return;
         }
@@ -118,7 +118,7 @@ contract TellorFlex {
     }
 
     function _updateStakeAndPayRewards(address _stakerAddress, uint256 _newStakedBalance) internal {
-        updateRewards();
+        _updateRewards();
         StakeInfo storage _staker = stakerDetails[_stakerAddress];
         if(_staker.stakedBalance > 0) {
             uint256 _pendingReward = _staker.stakedBalance * accumulatedRewardPerShare / 1e18 - _staker.rewardDebt;
@@ -140,7 +140,7 @@ contract TellorFlex {
 
     function addStakingRewards(uint256 _amount) external {
         require(token.transferFrom(msg.sender, address(this), _amount));
-        updateRewards();
+        _updateRewards();
         stakingRewardsBalance += _amount;
         rewardRate = (stakingRewardsBalance - (accumulatedRewardPerShare * totalStakeAmount - totalRewardDebt)) / 30 days;
     }  

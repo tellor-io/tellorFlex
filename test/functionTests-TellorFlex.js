@@ -330,8 +330,11 @@ describe("TellorFlex", function() {
 		expect(stakerDetails[0]).to.equal(blocky.timestamp)
 		expect(stakerDetails[1]).to.equal(h.toWei("90"))
 		expect(stakerDetails[2]).to.equal(h.toWei("10"))
-		expect(stakerDetails[3]).to.equal(blocky2.timestamp)
-		expect(stakerDetails[4]).to.equal(1)
+		expect(stakerDetails[3]).to.equal(0)
+		expect(stakerDetails[4]).to.equal(blocky2.timestamp)
+		expect(stakerDetails[5]).to.equal(1)
+		expect(stakerDetails[6]).to.equal(0)
+		expect(stakerDetails[7]).to.equal(0)
 	})
 
 	it("getTimeOfLastNewValue", async function() {
