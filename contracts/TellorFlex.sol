@@ -20,7 +20,7 @@ contract TellorFlex {
     uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
     uint256 public timeOfLastNewValue = block.timestamp; // time of the last new submitted value, originally set to the block timestamp
     uint256 public rewardRate;
-    uint256 public accumulatedRewardPerShare;
+    uint256 public accumulatedRewardPerShare; // accumulated reward per staked token
     uint256 public timeLastAllocation;
     uint256 public totalRewardDebt;
     uint256 public stakingRewardsBalance;
@@ -45,7 +45,7 @@ contract TellorFlex {
         uint256 reporterLastTimestamp; // timestamp of reporter's last reported value
         uint256 reportsSubmitted; // total number of reports submitted by reporter
         uint256 startVoteCount; // total number of governance votes when stake deposited
-        uint256 voteTally; // number of votes cast by staker since last reset
+        uint256 startVoteTally; // staker vote tally when stake deposited
         mapping(bytes32 => uint256) reportsSubmittedByQueryId;
     }
 
@@ -112,11 +112,6 @@ contract TellorFlex {
         timeLastAllocation = block.timestamp;
     }
 
-    function increaseVoteTally(address _voter) external {
-        require(msg.sender == governance, "caller must be governance address");
-        stakerDetails[_voter].voteTally++;
-    }
-
     function _updateStakeAndPayRewards(address _stakerAddress, uint256 _newStakedBalance) internal {
         _updateRewards();
         StakeInfo storage _staker = stakerDetails[_stakerAddress];
@@ -125,7 +120,7 @@ contract TellorFlex {
             // uint256 _numberOfVotes = IGovernance(governance).getVoteCount() - _staker.startVoteCount;
             uint256 _numberOfVotes = 0; // NOTE: UNCOMMENT ABOVE LINE AND REMOVE THIS LINE
             if(_numberOfVotes > 0) {
-                _pendingReward = _pendingReward * _staker.voteTally / _numberOfVotes;
+                _pendingReward = _pendingReward * (IGovernance(governance).getVoteTallyByAddress(_stakerAddress) - _staker.startVoteTally) / _numberOfVotes;
             }
             stakingRewardsBalance -= _pendingReward;
             token.transfer(msg.sender, _pendingReward);
@@ -220,6 +215,10 @@ contract TellorFlex {
                 _staker.lockedBalance = 0;
             }
         } else {
+            if(_staker.stakedBalance == 0) {
+                _staker.startVoteCount = IGovernance(governance).getVoteCount();
+                _staker.startVoteTally = IGovernance(governance).getVoteTallyByAddress(msg.sender);
+            }
             require(token.transferFrom(msg.sender, address(this), _amount));
         }
         _updateStakeAndPayRewards(msg.sender, _staker.stakedBalance + _amount);
@@ -535,7 +534,7 @@ contract TellorFlex {
      * @return uint reporter's last reported timestamp
      * @return uint total number of reports submitted by reporter
      * @return uint governance vote count when first staked
-     * @return uint number of votes cast by staker while staked
+     * @return uint number of votes cast by staker when first staked
      */
     function getStakerInfo(address _stakerAddress)
         external
@@ -560,7 +559,7 @@ contract TellorFlex {
             _staker.reporterLastTimestamp,
             _staker.reportsSubmitted,
             _staker.startVoteCount,
-            _staker.voteTally
+            _staker.startVoteTally
         );
     }
 
