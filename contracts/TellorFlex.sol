@@ -143,7 +143,23 @@ contract TellorFlex {
         updateRewards();
         stakingRewardsBalance += _amount;
         rewardRate = (stakingRewardsBalance - (accumulatedRewardPerShare * totalStakeAmount - totalRewardDebt)) / 30 days;
-    }    
+    }  
+
+    function getRewardRate() external view returns(uint256) {
+        return rewardRate;
+    }  
+
+    function getAccumulatedRewardPerShare() external view returns(uint256) {
+        return accumulatedRewardPerShare;
+    }
+
+    function getTotalRewardDebt() external view returns(uint256) {
+        return totalRewardDebt;
+    }
+
+    function getStakingRewardsBalance() external view returns(uint256) {
+        return stakingRewardsBalance;
+    }
 
     /**
      * @dev Changes governance address
@@ -511,14 +527,17 @@ contract TellorFlex {
 
     /**
      * @dev Allows users to retrieve all information about a staker
-     * @param _staker address of staker inquiring about
+     * @param _stakerAddress address of staker inquiring about
      * @return uint startDate of staking
      * @return uint current amount staked
      * @return uint current amount locked for withdrawal
+     * @return uint reward debt used to calculate staking rewards
      * @return uint reporter's last reported timestamp
      * @return uint total number of reports submitted by reporter
+     * @return uint governance vote count when first staked
+     * @return uint number of votes cast by staker while staked
      */
-    function getStakerInfo(address _staker)
+    function getStakerInfo(address _stakerAddress)
         external
         view
         returns (
@@ -526,15 +545,22 @@ contract TellorFlex {
             uint256,
             uint256,
             uint256,
+            uint256,
+            uint256,
+            uint256,
             uint256
         )
     {
+        StakeInfo storage _staker = stakerDetails[_stakerAddress];
         return (
-            stakerDetails[_staker].startDate,
-            stakerDetails[_staker].stakedBalance,
-            stakerDetails[_staker].lockedBalance,
-            stakerDetails[_staker].reporterLastTimestamp,
-            stakerDetails[_staker].reportsSubmitted
+            _staker.startDate,
+            _staker.stakedBalance,
+            _staker.lockedBalance,
+            _staker.rewardDebt,
+            _staker.reporterLastTimestamp,
+            _staker.reportsSubmitted,
+            _staker.startVoteCount,
+            _staker.voteTally
         );
     }
 
