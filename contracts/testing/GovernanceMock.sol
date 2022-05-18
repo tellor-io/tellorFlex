@@ -17,7 +17,7 @@ contract GovernanceMock {
         voteCount++;
     }
 
-    function vote(uint256 _disputeId) public {
+    function voteMock(uint256 _disputeId) public {
         require(_disputeId > 0, "Dispute ID must be greater than 0");
         require(_disputeId <= voteCount, "Vote does not exist");
         require(!voted[msg.sender][_disputeId], "Address already voted");

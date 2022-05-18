@@ -15,6 +15,7 @@ describe("TellorFlex e2e Tests", function() {
 	let accounts;
 	const STAKE_AMOUNT = web3.utils.toWei("10");
 	const REPORTING_LOCK = 43200; // 12 hours
+    const REWARD_RATE_TARGET = 60 * 60 * 24 * 30; // 30 days
 
 	beforeEach(async function () {
 		accounts = await ethers.getSigners();
@@ -179,11 +180,43 @@ describe("TellorFlex e2e Tests", function() {
         }
     })
 
-    it("Realistic test with staking rewards and disputes", async function() {
+    it.only("Realistic test with staking rewards and disputes", async function() {
         await token.mint(accounts[0].address, web3.utils.toWei("1000"))
         await token.approve(tellor.address, web3.utils.toWei("1000"))
+        // check initial conditions
+        expect(await tellor.getStakingRewardsBalance()).to.equal(0)
+        expect(await tellor.getRewardRate()).to.equal(0)
+        // add staking rewards
         await tellor.addStakingRewards(web3.utils.toWei("1000"))
+        // check conditions after adding rewards
         expect(await tellor.getStakingRewardsBalance()).to.equal(web3.utils.toWei("1000"))
+        expect(await tellor.getTotalRewardDebt()).to.equal(0)
+        expectedRewardRate = Math.floor(h.toWei("1000") / REWARD_RATE_TARGET)
+        expect(await tellor.getRewardRate()).to.equal(expectedRewardRate)
+        await governance.beginDisputeMock()
+        await governance.beginDisputeMock()
+        await governance.connect(accounts[1]).voteMock(1)
+        // deposit stake
+        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
+        blocky0 = await h.getBlock()
+        // check conditions after depositing stake
+        expect(await tellor.getStakingRewardsBalance()).to.equal(web3.utils.toWei("1000"))
+        expect(await tellor.getTotalRewardDebt()).to.equal(0)
+        expect(await tellor.getAccumulatedRewardPerShare()).to.equal(0)
+        expect(await tellor.getTimeOfLastAllocation()).to.equal(blocky0.timestamp)
+        stakerInfo = await tellor.getStakerInfo(accounts[1].address)
+        expect(stakerInfo[1]).to.equal(web3.utils.toWei("10")) // staked balance
+        expect(stakerInfo[3]).to.equal(0) // rewardDebt
+        expect(stakerInfo[6]).to.equal(2) // startVoteCount
+        expect(stakerInfo[7]).to.equal(1) // startVoteTally
+        
+        await h.advanceTime(86400 * 10)
+        expect(await token.balanceOf(accounts[1].address)).to.equal(h.toWei("990"))
+        await tellor.connect(accounts[1]).depositStake(0)
+        blocky1 = await h.getBlock()
+        expectedBalance = h.toWei("990") + (blocky1.timestamp - blocky0.timestamp) * expectedRewardRate
+        console.log("expectedReward: " + (blocky1.timestamp - blocky0.timestamp) * expectedRewardRate)
+        expect(await token.balanceOf(accounts[1].address)).to.equal(expectedBalance)
 
     })
 })
