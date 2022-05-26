@@ -4,7 +4,7 @@ const h = require("./helpers/helpers");
 var assert = require('assert');
 const web3 = require('web3');
 const { prependOnceListener } = require("process");
-// const { time } = require("@openzeppelin/test-helpers");
+const BN = ethers.BigNumber.from
 
 describe("TellorFlex e2e Tests", function() {
 
@@ -193,6 +193,7 @@ describe("TellorFlex e2e Tests", function() {
         expect(await tellor.getTotalRewardDebt()).to.equal(0)
         expectedRewardRate = Math.floor(h.toWei("1000") / REWARD_RATE_TARGET)
         expect(await tellor.getRewardRate()).to.equal(expectedRewardRate)
+        // create 2 mock disputes, vote once
         await governance.beginDisputeMock()
         await governance.beginDisputeMock()
         await governance.connect(accounts[1]).voteMock(1)
@@ -201,6 +202,7 @@ describe("TellorFlex e2e Tests", function() {
         blocky0 = await h.getBlock()
         // check conditions after depositing stake
         expect(await tellor.getStakingRewardsBalance()).to.equal(web3.utils.toWei("1000"))
+        expect(await tellor.getTotalStakeAmount()).to.equal(web3.utils.toWei("10"))
         expect(await tellor.getTotalRewardDebt()).to.equal(0)
         expect(await tellor.getAccumulatedRewardPerShare()).to.equal(0)
         expect(await tellor.getTimeOfLastAllocation()).to.equal(blocky0.timestamp)
@@ -209,14 +211,26 @@ describe("TellorFlex e2e Tests", function() {
         expect(stakerInfo[3]).to.equal(0) // rewardDebt
         expect(stakerInfo[6]).to.equal(2) // startVoteCount
         expect(stakerInfo[7]).to.equal(1) // startVoteTally
-        
+        // advance time
         await h.advanceTime(86400 * 10)
         expect(await token.balanceOf(accounts[1].address)).to.equal(h.toWei("990"))
+        // deposit 0 stake, update rewards
         await tellor.connect(accounts[1]).depositStake(0)
         blocky1 = await h.getBlock()
-        expectedBalance = h.toWei("990") + (blocky1.timestamp - blocky0.timestamp) * expectedRewardRate
-        console.log("expectedReward: " + (blocky1.timestamp - blocky0.timestamp) * expectedRewardRate)
+        // check conditions after updating rewards
+        expect(await tellor.getTimeOfLastAllocation()).to.equal(blocky1.timestamp)
+        expect(await tellor.getRewardRate()).to.equal(expectedRewardRate)
+        expectedAccumulatedRewardPerShare = BN(blocky1.timestamp - blocky0.timestamp).mul(expectedRewardRate).div(10)
+        expectedBalance = BN(h.toWei("10")).mul(expectedAccumulatedRewardPerShare).div(h.toWei("1")).add(h.toWei("990"))
         expect(await token.balanceOf(accounts[1].address)).to.equal(expectedBalance)
+        expect(await tellor.getAccumulatedRewardPerShare()).to.equal(expectedAccumulatedRewardPerShare)
+        expect(await tellor.getTotalRewardDebt()).to.equal(expectedBalance.sub(h.toWei("990")))
+        stakerInfo = await tellor.getStakerInfo(accounts[1].address)
+        expect(stakerInfo[1]).to.equal(h.toWei("10")) // staked balance
+        expect(stakerInfo[3]).to.equal(expectedBalance.sub(h.toWei("990"))) // rewardDebt
+        expect(stakerInfo[6]).to.equal(2) // startVoteCount
+        expect(stakerInfo[7]).to.equal(1) // startVoteTally
+        
 
     })
 })

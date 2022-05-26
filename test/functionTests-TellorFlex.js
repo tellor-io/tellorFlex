@@ -13,6 +13,17 @@ describe("TellorFlex", function() {
 	const STAKE_AMOUNT = web3.utils.toWei("10");
 	const REPORTING_LOCK = 43200; // 12 hours
 	const QUERYID1 = h.uintTob32(1)
+	const REWARD_RATE_TARGET = 60 * 60 * 24 * 30; // 30 days
+	const smap = {
+		startDate: 0,
+		stakedBalance: 1,
+		lockedBalance: 2,
+		rewardDebt: 3,
+		reporterLastTimestamp: 4,
+		reportsSubmitted: 5,
+		startVoteCount: 6,
+		startVoteTally: 7
+	} // getStakerInfo() indices
 
 	beforeEach(async function () {
 		accounts = await ethers.getSigners();
@@ -86,18 +97,22 @@ describe("TellorFlex", function() {
 		let blocky = await h.getBlock()
 		expect(await token.balanceOf(accounts[1].address)).to.equal(web3.utils.toWei("990"))
 		let stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[0]).to.equal(blocky.timestamp)
-		expect(stakerDetails[1]).to.equal(web3.utils.toWei("10"))
-		expect(stakerDetails[2]).to.equal(0)
-		expect(stakerDetails[3]).to.equal(0)
-		expect(stakerDetails[4]).to.equal(0)
+		expect(stakerDetails[smap.startDate]).to.equal(blocky.timestamp) // startDate
+		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("10")) // stakedBalance
+		expect(stakerDetails[smap.lockedBalance]).to.equal(0) // lockedBalance
+		expect(stakerDetails[smap.rewardDebt]).to.equal(0) // rewardDebt
+		expect(stakerDetails[smap.reporterLastTimestamp]).to.equal(0) // reporterLastTimestamp
+		expect(stakerDetails[smap.reportsSubmitted]).to.equal(0) // reportsSubmitted
+		expect(stakerDetails[smap.startVoteCount]).to.equal(0) // startVoteCount
+		expect(stakerDetails[smap.startVoteTally]).to.equal(0) // startVoteTally
+		expect(await tellor.totalRewardDebt()).to.equal(0)
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("10"))
 		await tellor.connect(accounts[1]).requestStakingWithdraw(h.toWei("5"))
 		await tellor.connect(accounts[1]).depositStake(h.toWei("10"))
 		expect(await token.balanceOf(accounts[1].address)).to.equal(web3.utils.toWei("985"))
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[1]).to.equal(web3.utils.toWei("15"))
-		expect(stakerDetails[2]).to.equal(0)
+		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("15"))
+		expect(stakerDetails[smap.lockedBalance]).to.equal(0)
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("15"))
 	})
 
@@ -122,18 +137,24 @@ describe("TellorFlex", function() {
 		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("100"))
 		let blocky = await h.getBlock()
 		let stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[0]).to.equal(blocky.timestamp)
-		expect(stakerDetails[1]).to.equal(web3.utils.toWei("100"))
-		expect(stakerDetails[2]).to.equal(0)
+		expect(stakerDetails[smap.startDate]).to.equal(blocky.timestamp)
+		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("100"))
+		expect(stakerDetails[smap.lockedBalance]).to.equal(0)
+		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("100"))
+		expect(await tellor.totalRewardDebt()).to.equal(0)
+		await h.expectThrow(tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("101"))) // insufficient staked balance
 		await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("10"))
 		blocky = await h.getBlock()
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[0]).to.equal(blocky.timestamp)
-		expect(stakerDetails[1]).to.equal(web3.utils.toWei("90"))
-		expect(stakerDetails[2]).to.equal(web3.utils.toWei("10"))
+		expect(stakerDetails[smap.startDate]).to.equal(blocky.timestamp)
+		expect(stakerDetails[smap.rewardDebt]).to.equal(0)
+		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("90"))
+		expect(stakerDetails[smap.lockedBalance]).to.equal(web3.utils.toWei("10"))
+		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("90"))
+		expect(await tellor.totalRewardDebt()).to.equal(0)
 	})
 
-	it("slashReporter", async function() {
+	it.only("slashReporter", async function() {
 		await h.expectThrow(tellor.connect(accounts[2]).slashReporter(accounts[1].address, accounts[2].address)) // only gov can slash reporter
 		await h.expectThrow(tellor.connect(govSigner).slashReporter(accounts[1].address, accounts[2].address)) // can't slash non-staked address
 		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
@@ -141,54 +162,66 @@ describe("TellorFlex", function() {
 		await h.expectThrow(tellor.connect(accounts[2]).slashReporter(accounts[1].address, accounts[2].address)) // only gov can slash reporter
 		// Slash when lockedBalance = 0
 		let stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[1]).to.equal(web3.utils.toWei("100"))
-		expect(stakerDetails[2]).to.equal(0)
+		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("100"))
+		expect(stakerDetails[smap.lockedBalance]).to.equal(0)
 		expect(await token.balanceOf(accounts[2].address)).to.equal(0)
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("100"))
 		await tellor.connect(govSigner).slashReporter(accounts[1].address, accounts[2].address)
+		blocky0 = await h.getBlock()
+		expect(await tellor.timeOfLastAllocation()).to.equal(blocky0.timestamp)
+		expect(await tellor.accumulatedRewardPerShare()).to.equal(0)
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[1]).to.equal(web3.utils.toWei("90"))
-		expect(stakerDetails[2]).to.equal(0)
+		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("90"))
+		expect(stakerDetails[smap.lockedBalance]).to.equal(0)
 		expect(await token.balanceOf(accounts[2].address)).to.equal(web3.utils.toWei("10"))
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("90"))
 		// Slash when lockedBalance >= stakeAmount
 		await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("10"))
+		blocky1 = await h.getBlock()
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[1]).to.equal(web3.utils.toWei("80"))
-		expect(stakerDetails[2]).to.equal(web3.utils.toWei("10"))
+		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("80"))
+		expect(stakerDetails[smap.lockedBalance]).to.equal(web3.utils.toWei("10"))
 		await tellor.connect(govSigner).slashReporter(accounts[1].address, accounts[2].address)
+		expect(await tellor.timeOfLastAllocation()).to.equal(blocky1.timestamp)
+		expect(await tellor.accumulatedRewardPerShare()).to.equal(0)
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[1]).to.equal(web3.utils.toWei("80"))
-		expect(stakerDetails[2]).to.equal(0)
+		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("80"))
+		expect(stakerDetails[smap.lockedBalance]).to.equal(0)
 		expect(await token.balanceOf(accounts[2].address)).to.equal(web3.utils.toWei("20"))
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("80"))
 		// Slash when 0 < lockedBalance < stakeAmount
 		await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("5"))
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[1]).to.equal(web3.utils.toWei("75"))
-		expect(stakerDetails[2]).to.equal(web3.utils.toWei("5"))
+		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("75"))
+		expect(stakerDetails[smap.lockedBalance]).to.equal(web3.utils.toWei("5"))
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("75"))
 		await tellor.connect(govSigner).slashReporter(accounts[1].address, accounts[2].address)
+		blocky2 = await h.getBlock()
+		expect(await tellor.timeOfLastAllocation()).to.equal(blocky2.timestamp)
+		expect(await tellor.accumulatedRewardPerShare()).to.equal(0)
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[1]).to.equal(web3.utils.toWei("70"))
-		expect(stakerDetails[2]).to.equal(0)
+		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("70"))
+		expect(stakerDetails[smap.lockedBalance]).to.equal(0)
 		expect(await token.balanceOf(accounts[2].address)).to.equal(web3.utils.toWei("30"))
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("70"))
 		// Slash when lockedBalance + stakedBalance < stakeAmount
 		await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("65"))
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[1]).to.equal(web3.utils.toWei("5"))
-		expect(stakerDetails[2]).to.equal(web3.utils.toWei("65"))
+		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("5"))
+		expect(stakerDetails[smap.lockedBalance]).to.equal(web3.utils.toWei("65"))
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("5"))
 		await h.advanceTime(604800)
 		await tellor.connect(accounts[1]).withdrawStake()
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[1]).to.equal(web3.utils.toWei("5"))
-		expect(stakerDetails[2]).to.equal(web3.utils.toWei("0"))
+		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("5"))
+		expect(stakerDetails[smap.lockedBalance]).to.equal(web3.utils.toWei("0"))
 		await tellor.connect(govSigner).slashReporter(accounts[1].address, accounts[2].address)
+		blocky = await h.getBlock()
+		expect(await tellor.timeOfLastAllocation()).to.equal(blocky.timestamp)
+		expect(await tellor.accumulatedRewardPerShare()).to.equal(0)
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[1]).to.equal(0)
-		expect(stakerDetails[2]).to.equal(0)
+		expect(stakerDetails[smap.stakedBalance]).to.equal(0)
+		expect(stakerDetails[smap.lockedBalance]).to.equal(0)
 		expect(await token.balanceOf(accounts[2].address)).to.equal(web3.utils.toWei("35"))
 		expect(await tellor.totalStakeAmount()).to.equal(0)
 	})
@@ -211,7 +244,7 @@ describe("TellorFlex", function() {
 		expect(await tellor.timeOfLastNewValue()).to.equal(blocky.timestamp)
 		expect(await tellor.getReportsSubmittedByAddress(accounts[1].address)).to.equal(2)
 		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, QUERYID1)).to.equal(2)
-	})
+	}) 
 
 	it("withdrawStake", async function() {
 		await token.connect(accounts[1]).transfer(tellor.address, web3.utils.toWei("100"))
@@ -221,15 +254,15 @@ describe("TellorFlex", function() {
 		await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("10"))
 		await h.expectThrow(tellor.connect(accounts[1]).withdrawStake()) // 7 days didn't pass
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[1]).to.equal(h.toWei("90"))
-		expect(stakerDetails[2]).to.equal(h.toWei("10"))
+		expect(stakerDetails[smap.stakedBalance]).to.equal(h.toWei("90"))
+		expect(stakerDetails[smap.lockedBalance]).to.equal(h.toWei("10"))
 		await h.advanceTime(60*60*24*7)
 		expect(await token.balanceOf(accounts[1].address)).to.equal(h.toWei("800"))
 		await tellor.connect(accounts[1]).withdrawStake()
 		expect(await token.balanceOf(accounts[1].address)).to.equal(h.toWei("810"))
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[1]).to.equal(h.toWei("90"))
-		expect(stakerDetails[2]).to.equal(0)
+		expect(stakerDetails[smap.stakedBalance]).to.equal(h.toWei("90"))
+		expect(stakerDetails[smap.lockedBalance]).to.equal(0)
 		await h.expectThrow(tellor.connect(accounts[1]).withdrawStake()) // reporter not locked for withdrawal
 	})
 
@@ -339,14 +372,14 @@ describe("TellorFlex", function() {
 		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
 		blocky2 = await h.getBlock()
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
-		expect(stakerDetails[0]).to.equal(blocky.timestamp)
-		expect(stakerDetails[1]).to.equal(h.toWei("90"))
-		expect(stakerDetails[2]).to.equal(h.toWei("10"))
-		expect(stakerDetails[3]).to.equal(0)
-		expect(stakerDetails[4]).to.equal(blocky2.timestamp)
-		expect(stakerDetails[5]).to.equal(1)
-		expect(stakerDetails[6]).to.equal(0)
-		expect(stakerDetails[7]).to.equal(0)
+		expect(stakerDetails[smap.startDate]).to.equal(blocky.timestamp)
+		expect(stakerDetails[smap.stakedBalance]).to.equal(h.toWei("90"))
+		expect(stakerDetails[smap.lockedBalance]).to.equal(h.toWei("10"))
+		expect(stakerDetails[smap.rewardDebt]).to.equal(0)
+		expect(stakerDetails[smap.reporterLastTimestamp]).to.equal(blocky2.timestamp)
+		expect(stakerDetails[smap.reportsSubmitted]).to.equal(1)
+		expect(stakerDetails[smap.startVoteCount]).to.equal(0)
+		expect(stakerDetails[smap.startVoteTally]).to.equal(0)
 	})
 
 	it("getTimeOfLastNewValue", async function() {
@@ -398,5 +431,18 @@ describe("TellorFlex", function() {
 		await tellor.submitValue(QUERYID1, h.uintTob32(4001), 0, '0x')
 		blocky = await h.getBlock()
 		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.uintTob32(4001))
+	})
+
+	it("addStakingRewards", async function() {
+		await token.mint(accounts[2].address, h.toWei("1000"))
+		await h.expectThrow(tellor.connect(accounts[2]).addStakingRewards(h.toWei("1000"))) // require token.transferFrom...
+		await token.connect(accounts[2]).approve(tellor.address, h.toWei("1000"))
+		expect(await token.balanceOf(accounts[2].address)).to.equal(h.toWei("1000"))
+		await tellor.connect(accounts[2]).addStakingRewards(h.toWei("1000"))
+		expect(await tellor.stakingRewardsBalance()).to.equal(h.toWei("1000"))
+		expect(await token.balanceOf(accounts[2].address)).to.equal(0)
+		expect(await token.balanceOf(tellor.address)).to.equal(h.toWei("1000"))
+		expectedRewardRate = Math.floor(h.toWei("1000") / REWARD_RATE_TARGET)
+		expect(await tellor.rewardRate()).to.equal(expectedRewardRate)
 	})
 });
