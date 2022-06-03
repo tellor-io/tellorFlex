@@ -274,6 +274,12 @@ contract TellorFlex {
         rep.timestampToBlockNum[block.timestamp] = block.number;
         rep.valueByTimestamp[block.timestamp] = _value;
         rep.reporterByTimestamp[block.timestamp] = msg.sender;
+        // Disperse Time Based Reward
+        uint256 _timeDiff = block.timestamp - timeOfLastNewValue;
+        uint256 _reward = (_timeDiff * timeBasedReward) / 300; //.5 TRB per 5 minutes
+        if (_reward > 0) {
+            token.transfer(msg.sender, _reward);
+        }
         // Update last oracle value and number of values submitted by a reporter
         timeOfLastNewValue = block.timestamp;
         _staker.reportsSubmitted++;
