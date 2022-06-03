@@ -71,29 +71,6 @@ describe("TellorFlex e2e Tests", function() {
         let vars = await tellor.getStakerInfo(accounts[1].address)
         assert(vars[1] == web3.utils.toWei("30"), "should still have money staked")
     })
-    it("Upgrade Governance Contract", async function() {
-        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
-        let governanceAddress = await tellor.getGovernanceAddress()
-		expect(governanceAddress).to.equal(governance.address)
-		await h.expectThrow(tellor.connect(accounts[1]).changeGovernanceAddress(accounts[1].address)) // Only governance can change gov address
-		await tellor.connect(govSigner).changeGovernanceAddress(accounts[1].address)
-		governanceAddress = await tellor.getGovernanceAddress()
-		expect(governanceAddress).to.equal(accounts[1].address)
-		await h.expectThrow(tellor.connect(govSigner).changeGovernanceAddress(accounts[0].address)) // Only governance can change gov address
-		await tellor.connect(accounts[1]).changeGovernanceAddress(govSigner.address)
-        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
-        await h.advanceTime(86400/4)
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
-    })
-    it("Check reducing stake amount in the future", async function() {
-        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
-        await h.advanceTime(86400/4 + 10)
-        h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(102), 1, '0x'))
-		await tellor.connect(govSigner).changeStakeAmount(web3.utils.toWei("5"))
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(102), 1, '0x')
-    })
     it("Bad value placed, withdraw requested, dispute started", async function() {
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("120"))
         await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(4000), 0, '0x')
@@ -102,32 +79,6 @@ describe("TellorFlex e2e Tests", function() {
         await tellor.connect(govSigner).removeValue(h.uintTob32(1), blocky.timestamp)
         await tellor.connect(govSigner).slashReporter(accounts[1].address, accounts[2].address)
 		await h.expectThrow(tellor.connect(accounts[1]).withdrawStake()) // 7 days didn't pass
-    })
-    it("Increase reporter lock time", async function() {
-        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
-        let reportingLock = await tellor.getReportingLock()
-		expect(reportingLock).to.equal(REPORTING_LOCK)
-		await tellor.connect(govSigner).changeReportingLock(86400)
-		reportingLock = await tellor.getReportingLock()
-		expect(reportingLock).to.equal(86400)
-        await h.advanceTime(86400/2)
-        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x'))
-        await h.advanceTime(86420/2)
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
-    })
-    it("Check increasing stake amount in future", async function() {
-        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
-        let stakeAmount = await tellor.getStakeAmount()
-		expect(stakeAmount).to.equal(STAKE_AMOUNT)
-    	await tellor.connect(govSigner).changeStakeAmount(web3.utils.toWei("1000"))
-		stakeAmount = await tellor.getStakeAmount()
-		expect(stakeAmount).to.equal(web3.utils.toWei("1000"))
-        await h.advanceTime(86400/2)
-        h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x'))
-        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("990"))
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x')
     })
     it("Mine 2 values on 50 different ID's", async function() {
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
@@ -148,16 +99,6 @@ describe("TellorFlex e2e Tests", function() {
         let repC2 = await tellor.getReportsSubmittedByAddress(accounts[2].address)
         assert(repC1 == 50, "reporter count 1 should be correct")
         assert(repC2 == 50, "reporter 2 count should be correct")
-    })
-    it("Decrease reporter lock time", async function() {
-        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
-        await h.advanceTime(86400/4)
-        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x'))
-        let reportingLock = await tellor.getReportingLock()
-		expect(reportingLock).to.equal(REPORTING_LOCK)
-		await tellor.connect(govSigner).changeReportingLock(86400/4)
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x')
     })
     it("Realistic test (actual variables we'll use)", async function() {
         for(i=0;i<20;i++){
@@ -180,7 +121,6 @@ describe("TellorFlex e2e Tests", function() {
         // await tellor.connect(govSigner).changeGovernanceAddress(accounts[1].address)
         for(i=1;i<3;i++){
             await tellor.connect(accounts[i]).requestStakingWithdraw(web3.utils.toWei("10"))
-            console.log("round: " + i)
             await h.advanceTime(60*60*24*7)
             await tellor.connect(accounts[i]).withdrawStake()
         }
@@ -190,7 +130,7 @@ describe("TellorFlex e2e Tests", function() {
             await h.advanceTime(86400/2)
         }
     })
-    it.only("Realistic test with staking rewards and disputes", async function() {
+    it("Realistic test with staking rewards and disputes", async function() {
         await token.mint(accounts[0].address, web3.utils.toWei("1000"))
         await token.approve(tellor.address, web3.utils.toWei("1000"))
         // check initial conditions

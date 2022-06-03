@@ -101,45 +101,6 @@ contract TellorFlex {
     }  
 
     /**
-     * @dev Changes governance address
-     * @param _newGovernanceAddress new governance address
-     */
-    function changeGovernanceAddress(address _newGovernanceAddress) external {
-        require(msg.sender == governance, "caller must be governance address");
-        require(
-            _newGovernanceAddress != address(0),
-            "must set governance address"
-        );
-        governance = _newGovernanceAddress;
-        emit NewGovernanceAddress(_newGovernanceAddress);
-    }
-
-    /**
-     * @dev Changes base amount of time (seconds) before reporter is allowed to report again
-     * @param _newReportingLock new reporter lock time in seconds
-     */
-    function changeReportingLock(uint256 _newReportingLock) external {
-        require(msg.sender == governance, "caller must be governance address");
-        require(
-            _newReportingLock > 0,
-            "reporting lock must be greater than zero"
-        );
-        reportingLock = _newReportingLock;
-        emit NewReportingLock(_newReportingLock);
-    }
-
-    /**
-     * @dev Changes amount of token stake required to report values
-     * @param _newStakeAmount new reporter stake amount
-     */
-    function changeStakeAmount(uint256 _newStakeAmount) external {
-        require(msg.sender == governance, "caller must be governance address");
-        require(_newStakeAmount > 0, "stake amount must be greater than zero");
-        stakeAmount = _newStakeAmount;
-        emit NewStakeAmount(_newStakeAmount);
-    }
-
-    /**
      * @dev Allows a reporter to submit stake
      * @param _amount amount of tokens to stake
      */
@@ -648,8 +609,6 @@ contract TellorFlex {
             if(_numberOfVotes > 0) {
                 _pendingReward = _pendingReward * (IGovernance(governance).getVoteTallyByAddress(_stakerAddress) - _staker.startVoteTally) / _numberOfVotes;
             }
-            console.log("number of votes: ", _numberOfVotes);
-            console.log("_pendingReward: ", _pendingReward);
             stakingRewardsBalance -= _pendingReward;
             token.transfer(msg.sender, _pendingReward);
             totalRewardDebt -= _staker.rewardDebt;
