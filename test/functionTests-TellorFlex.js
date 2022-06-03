@@ -154,7 +154,7 @@ describe("TellorFlex", function() {
 		expect(await tellor.totalRewardDebt()).to.equal(0)
 	})
 
-	it.only("slashReporter", async function() {
+	it("slashReporter", async function() {
 		await h.expectThrow(tellor.connect(accounts[2]).slashReporter(accounts[1].address, accounts[2].address)) // only gov can slash reporter
 		await h.expectThrow(tellor.connect(govSigner).slashReporter(accounts[1].address, accounts[2].address)) // can't slash non-staked address
 		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))

@@ -636,10 +636,20 @@ contract TellorFlex {
         StakeInfo storage _staker = stakerDetails[_stakerAddress];
         if(_staker.stakedBalance > 0) {
             uint256 _pendingReward = _staker.stakedBalance * accumulatedRewardPerShare / 1e18 - _staker.rewardDebt;
-            uint256 _numberOfVotes = IGovernance(governance).getVoteCount() - _staker.startVoteCount;
+            // OPTION 1
+            // uint256 _numberOfVotes = IGovernance(governance).getVoteCount() - _staker.startVoteCount;
+
+            // OPTION 2 - more modular approach. Works with any governance implementation. EOAs will return 0 votes
+            uint256 _numberOfVotes;
+            (bool _success, bytes memory _returnData) = governance.call(abi.encodeWithSignature("getVoteCount()"));
+            if(_success) {
+                _numberOfVotes = uint256(abi.decode(_returnData, (uint256))) - _staker.startVoteCount;
+            }
             if(_numberOfVotes > 0) {
                 _pendingReward = _pendingReward * (IGovernance(governance).getVoteTallyByAddress(_stakerAddress) - _staker.startVoteTally) / _numberOfVotes;
             }
+            console.log("number of votes: ", _numberOfVotes);
+            console.log("_pendingReward: ", _pendingReward);
             stakingRewardsBalance -= _pendingReward;
             token.transfer(msg.sender, _pendingReward);
             totalRewardDebt -= _staker.rewardDebt;
