@@ -134,15 +134,15 @@ describe("TellorFlex e2e Tests", function() {
         await token.mint(accounts[0].address, web3.utils.toWei("1000"))
         await token.approve(tellor.address, web3.utils.toWei("1000"))
         // check initial conditions
-        expect(await tellor.getStakingRewardsBalance()).to.equal(0)
-        expect(await tellor.getRewardRate()).to.equal(0)
+        expect(await tellor.stakingRewardsBalance()).to.equal(0)
+        expect(await tellor.rewardRate()).to.equal(0)
         // add staking rewards
         await tellor.addStakingRewards(web3.utils.toWei("1000"))
         // check conditions after adding rewards
-        expect(await tellor.getStakingRewardsBalance()).to.equal(web3.utils.toWei("1000"))
-        expect(await tellor.getTotalRewardDebt()).to.equal(0)
+        expect(await tellor.stakingRewardsBalance()).to.equal(web3.utils.toWei("1000"))
+        expect(await tellor.totalRewardDebt()).to.equal(0)
         expectedRewardRate = Math.floor(h.toWei("1000") / REWARD_RATE_TARGET)
-        expect(await tellor.getRewardRate()).to.equal(expectedRewardRate)
+        expect(await tellor.rewardRate()).to.equal(expectedRewardRate)
         // create 2 mock disputes, vote once
         await governance.beginDisputeMock()
         await governance.beginDisputeMock()
@@ -151,11 +151,11 @@ describe("TellorFlex e2e Tests", function() {
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
         blocky0 = await h.getBlock()
         // check conditions after depositing stake
-        expect(await tellor.getStakingRewardsBalance()).to.equal(web3.utils.toWei("1000"))
+        expect(await tellor.stakingRewardsBalance()).to.equal(web3.utils.toWei("1000"))
         expect(await tellor.getTotalStakeAmount()).to.equal(web3.utils.toWei("10"))
-        expect(await tellor.getTotalRewardDebt()).to.equal(0)
-        expect(await tellor.getAccumulatedRewardPerShare()).to.equal(0)
-        expect(await tellor.getTimeOfLastAllocation()).to.equal(blocky0.timestamp)
+        expect(await tellor.totalRewardDebt()).to.equal(0)
+        expect(await tellor.accumulatedRewardPerShare()).to.equal(0)
+        expect(await tellor.timeOfLastAllocation()).to.equal(blocky0.timestamp)
         stakerInfo = await tellor.getStakerInfo(accounts[1].address)
         expect(stakerInfo[smap.stakedBalance]).to.equal(web3.utils.toWei("10")) // staked balance
         expect(stakerInfo[smap.rewardDebt]).to.equal(0) // rewardDebt
@@ -168,13 +168,13 @@ describe("TellorFlex e2e Tests", function() {
         await tellor.connect(accounts[1]).depositStake(0)
         blocky1 = await h.getBlock()
         // check conditions after updating rewards
-        expect(await tellor.getTimeOfLastAllocation()).to.equal(blocky1.timestamp)
-        expect(await tellor.getRewardRate()).to.equal(expectedRewardRate)
+        expect(await tellor.timeOfLastAllocation()).to.equal(blocky1.timestamp)
+        expect(await tellor.rewardRate()).to.equal(expectedRewardRate)
         expectedAccumulatedRewardPerShare = BN(blocky1.timestamp - blocky0.timestamp).mul(expectedRewardRate).div(10)
         expectedBalance = BN(h.toWei("10")).mul(expectedAccumulatedRewardPerShare).div(h.toWei("1")).add(h.toWei("990"))
         expect(await token.balanceOf(accounts[1].address)).to.equal(expectedBalance)
-        expect(await tellor.getAccumulatedRewardPerShare()).to.equal(expectedAccumulatedRewardPerShare)
-        expect(await tellor.getTotalRewardDebt()).to.equal(expectedBalance.sub(h.toWei("990")))
+        expect(await tellor.accumulatedRewardPerShare()).to.equal(expectedAccumulatedRewardPerShare)
+        expect(await tellor.totalRewardDebt()).to.equal(expectedBalance.sub(h.toWei("990")))
         stakerInfo = await tellor.getStakerInfo(accounts[1].address)
         expect(stakerInfo[smap.stakedBalance]).to.equal(h.toWei("10")) // staked balance
         expect(stakerInfo[smap.rewardDebt]).to.equal(expectedBalance.sub(h.toWei("990"))) // rewardDebt
@@ -188,8 +188,8 @@ describe("TellorFlex e2e Tests", function() {
         await tellor.connect(accounts[1]).depositStake(0)
         blocky2 = await h.getBlock()
         // check conditions after updating rewards
-        expect(await tellor.getTimeOfLastAllocation()).to.equal(blocky2.timestamp)
-        expect(await tellor.getRewardRate()).to.equal(expectedRewardRate)
+        expect(await tellor.timeOfLastAllocation()).to.equal(blocky2.timestamp)
+        expect(await tellor.rewardRate()).to.equal(expectedRewardRate)
         expectedAccumulatedRewardPerShare = BN(blocky2.timestamp - blocky1.timestamp).mul(expectedRewardRate).div(10).add(expectedAccumulatedRewardPerShare)
         expect(await token.balanceOf(accounts[1].address)).to.equal(expectedBalance)
         expect(await tellor.accumulatedRewardPerShare()).to.equal(expectedAccumulatedRewardPerShare)
@@ -209,8 +209,8 @@ describe("TellorFlex e2e Tests", function() {
         await tellor.connect(accounts[1]).depositStake(0)
         blocky3 = await h.getBlock()
         // check conditions after updating rewards
-        expect(await tellor.getTimeOfLastAllocation()).to.equal(blocky3.timestamp)
-        expect(await tellor.getRewardRate()).to.equal(expectedRewardRate)
+        expect(await tellor.timeOfLastAllocation()).to.equal(blocky3.timestamp)
+        expect(await tellor.rewardRate()).to.equal(expectedRewardRate)
         expectedAccumulatedRewardPerShare = BN(blocky3.timestamp - blocky2.timestamp).mul(expectedRewardRate).div(10).add(expectedAccumulatedRewardPerShare)
         expectedBalance = expectedBalance.add(expectedAccumulatedRewardPerShare.mul(10).sub(expectedRewardDebt).div(2)) 
         expect(await token.balanceOf(accounts[1].address)).to.equal(expectedBalance)
@@ -222,5 +222,43 @@ describe("TellorFlex e2e Tests", function() {
         expect(stakerInfo[smap.rewardDebt]).to.equal(expectedRewardDebt) // rewardDebt
         expect(stakerInfo[smap.startVoteCount]).to.equal(2) // startVoteCount
         expect(stakerInfo[7]).to.equal(1) // startVoteTally
+        expect(await tellor.stakingRewardsBalance()).to.equal(BN(h.toWei("1000")).sub(expectedBalance).add(h.toWei("990")))
+    })
+    it("Realistic test with multiple stakers", async function() {
+        await token.mint(accounts[0].address, web3.utils.toWei("1000"))
+        await token.approve(tellor.address, web3.utils.toWei("1000"))
+        await tellor.addStakingRewards(h.toWei("1000"))
+        for(i=1;i<20;i++){
+            await token.mint(accounts[i].address, web3.utils.toWei("100"));
+            await token.connect(accounts[i]).approve(tellor.address, web3.utils.toWei("100"))
+            await tellor.connect(accounts[i]).depositStake(web3.utils.toWei("100"))
+        }
+        await h.advanceTime(86400 * 10)
+        for(i=1;i<20;i++){
+            await token.mint(accounts[0].address, web3.utils.toWei("1"))
+            await token.approve(tellor.address, web3.utils.toWei("1"))
+            await tellor.addStakingRewards(h.toWei("1"))
+            await token.mint(accounts[i].address, web3.utils.toWei("100"));
+            await token.connect(accounts[i]).approve(tellor.address, web3.utils.toWei("100"))
+            await tellor.connect(accounts[i]).depositStake(web3.utils.toWei("100"))
+        }
+        await h.advanceTime(86400 * 10)
+        for(i=1;i<20;i++){
+            await token.mint(accounts[0].address, web3.utils.toWei("1"))
+            await token.approve(tellor.address, web3.utils.toWei("1"))
+            await tellor.addStakingRewards(h.toWei("1"))
+            await token.mint(accounts[i].address, web3.utils.toWei("100"));
+            await token.connect(accounts[i]).approve(tellor.address, web3.utils.toWei("100"))
+            await tellor.connect(accounts[i]).depositStake(web3.utils.toWei("100"))
+        }
+        await h.advanceTime(86400 * 60)
+        for(i=1;i<20;i++){
+            stakerDetails = await tellor.getStakerInfo(accounts[i].address)
+            await tellor.connect(accounts[i]).requestStakingWithdraw(stakerDetails[smap.stakedBalance])
+        }
+        await h.advanceTime(86400 * 8)
+        for(i=1;i<20;i++){
+            await tellor.connect(accounts[i]).withdrawStake()
+        }
     })
 })
