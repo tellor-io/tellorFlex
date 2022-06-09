@@ -44,7 +44,7 @@ require("dotenv").config();
         count: 40,
       },
       forking: {
-        url: "https://eth-mainnet.alchemyapi.io/v2/7dW8KCqWwKa1vdaitq-SxmKfxWZ4yPG6"
+        url: process.env.FORKING_NODE_URL
       },
       allowUnlimitedContractSize: true
     },

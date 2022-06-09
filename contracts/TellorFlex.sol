@@ -14,7 +14,7 @@ import "./interfaces/IERC20.sol";
 contract TellorFlex {
     IERC20 public token;
     address public governance;
-    uint256 public timeBasedReward;
+    uint256 public timeBasedReward = 5e17;
     uint256 public stakeAmount; //amount required to be a staker
     uint256 public totalStakeAmount; //total amount of tokens locked in contract (via stake)
     uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
@@ -73,8 +73,7 @@ contract TellorFlex {
         address _token,
         address _governance,
         uint256 _stakeAmount,
-        uint256 _reportingLock,
-        uint256 _timeBasedReward
+        uint256 _reportingLock
     ) {
         require(_token != address(0), "must set token address");
         require(_governance != address(0), "must set governance address");
@@ -82,7 +81,6 @@ contract TellorFlex {
         governance = _governance;
         stakeAmount = _stakeAmount;
         reportingLock = _reportingLock;
-        timeBasedReward = _timeBasedReward;
     }
 
     /**
@@ -280,7 +278,7 @@ contract TellorFlex {
         // Disperse Time Based Reward
         uint256 _timeDiff = block.timestamp - timeOfLastNewValue;
         uint256 _reward = (_timeDiff * timeBasedReward) / 300; //.5 TRB per 5 minutes
-        if (_reward > 0) {
+        if (_reward > 0 && token.balanceOf(address(this)) > _reward) {
             token.transfer(msg.sender, _reward);
         }
         // Update last oracle value and number of values submitted by a reporter
