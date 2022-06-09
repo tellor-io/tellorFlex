@@ -65,21 +65,25 @@ contract TellorFlex {
      * @dev Initializes system parameters
      * @param _token address of token used for staking
      * @param _governance address which controls system
-     * @param _stakeAmount amount of token needed to report oracle values
+     * @param _stakeAmountDollars fixed amount of dollars that TRB stake amount is worth
+     * @param _priceTRB price of TRB in USD
      * @param _reportingLock base amount of time (seconds) before reporter is able to report again
      */
     constructor(
         address _token,
         address _governance,
-        uint256 _stakeAmount,
-        uint256 _reportingLock
+        // uint256 _stakeAmount,
+        uint256 _reportingLock,
+        uint256 _stakeAmountDollars,
+        uint256 _priceTRB
     ) {
         require(_token != address(0), "must set token address");
         require(_governance != address(0), "must set governance address");
         token = IERC20(_token);
         governance = _governance;
-        stakeAmount = _stakeAmount;
+        // stakeAmount = _stakeAmount;
         reportingLock = _reportingLock;
+        stakeAmount = _stakeAmountDollars / _priceTRB;
     }
 
     /**
