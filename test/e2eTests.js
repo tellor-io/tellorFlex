@@ -11,7 +11,8 @@ describe("TellorFlex e2e Tests", function() {
 	let tellor;
 	let token;
 	let accounts;
-	const STAKE_AMOUNT = web3.utils.toWei("10");
+	const STAKE_AMOUNT_USD = 10 ** 1e18; // 10 USD
+    const PRICE_TRB = 100 ** 1e18; // 1 TRB = 100 USD
 	const REPORTING_LOCK = 43200; // 12 hours
 
 	beforeEach(async function () {
@@ -20,7 +21,7 @@ describe("TellorFlex e2e Tests", function() {
 		token = await ERC20.deploy();
 		await token.deployed();
 		const TellorFlex = await ethers.getContractFactory("TellorFlex");
-		tellor = await TellorFlex.deploy(token.address, accounts[0].address, STAKE_AMOUNT, REPORTING_LOCK);
+		tellor = await TellorFlex.deploy(token.address, accounts[0].address, STAKE_AMOUNT_USD, PRICE_TRB, REPORTING_LOCK);
 		await tellor.deployed();
 		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
         await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
@@ -97,7 +98,7 @@ describe("TellorFlex e2e Tests", function() {
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
         await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
         let stakeAmount = await tellor.getStakeAmount()
-		expect(stakeAmount).to.equal(STAKE_AMOUNT)
+		expect(stakeAmount).to.equal(STAKE_AMOUNT_USD / PRICE_TRB)
     	await tellor.changeStakeAmount(web3.utils.toWei("1000"))
 		stakeAmount = await tellor.getStakeAmount()
 		expect(stakeAmount).to.equal(web3.utils.toWei("1000"))
@@ -105,6 +106,23 @@ describe("TellorFlex e2e Tests", function() {
         h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x'))
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("990"))
         await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x')
+
+    })
+    it("Check updating stake amount base on price of TRB in USD", async function() {
+        // submit value for price of TRB using query id
+        // change query id to be actual query id of TRB/USD spot price
+        let newTrbPrice = web3.utils.toWei("70")
+        let newStakeAmountDollars = 35
+        let trbUsdSpotPriceQueryId = h.uintTob32(2)
+        await tellor.connect(accounts[1]).depositStake(STAKE_AMOUNT_USD / PRICE_TRB)
+        await tellor.connect(accounts[1]).submitValue(trbUsdSpotPriceQueryId, h.bytes(newTrbPrice), 0, '0x')
+        
+        // call changeStakeAmountDollars
+        await tellor.changeStakeAmountDollars(newStakeAmountDollars, trbUsdSpotPriceQueryId)
+
+        // check that stake amount is updated
+        let stakeAmount = await tellor.getStakeAmount()
+        expect(stakeAmount).to.equal(newStakeAmountDollars / newTrbPrice)
     })
     it("Mine 2 values on 50 different ID's", async function() {
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))

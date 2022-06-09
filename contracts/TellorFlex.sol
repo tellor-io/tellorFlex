@@ -128,7 +128,10 @@ contract TellorFlex {
     @param _newStakeAmountDollars new reporter stake amount in dollars
     @param _queryId query ID of spot price of TRB in USD
      */
-    function changeStakeAmountDollars(uint256 _newStakeAmountDollars) external {
+    function changeStakeAmountDollars(
+        uint256 _newStakeAmountDollars,
+        bytes32 _queryId
+    ) external {
         require(msg.sender == governance, "caller must be governance address");
         require(
             _newStakeAmountDollars > 0,
