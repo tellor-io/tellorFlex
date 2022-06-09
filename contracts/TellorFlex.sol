@@ -72,7 +72,6 @@ contract TellorFlex {
     constructor(
         address _token,
         address _governance,
-        // uint256 _stakeAmount,
         uint256 _reportingLock,
         uint256 _stakeAmountDollars,
         uint256 _priceTRB
@@ -81,7 +80,6 @@ contract TellorFlex {
         require(_governance != address(0), "must set governance address");
         token = IERC20(_token);
         governance = _governance;
-        // stakeAmount = _stakeAmount;
         reportingLock = _reportingLock;
         stakeAmount = _stakeAmountDollars / _priceTRB;
     }
@@ -123,6 +121,22 @@ contract TellorFlex {
         require(_newStakeAmount > 0, "stake amount must be greater than zero");
         stakeAmount = _newStakeAmount;
         emit NewStakeAmount(_newStakeAmount);
+    }
+
+    /**
+    * @dev Changes amount of token stake required based on price of TRB in USD
+    @param _newStakeAmountDollars new reporter stake amount in dollars
+    @param _queryId query ID of spot price of TRB in USD
+     */
+    function changeStakeAmountDollars(uint256 _newStakeAmountDollars) external {
+        require(msg.sender == governance, "caller must be governance address");
+        require(
+            _newStakeAmountDollars > 0,
+            "stake amount must be greater than zero"
+        );
+        uint256 priceTRB = getCurrentValue(_queryId);
+        stakeAmount = _newStakeAmountDollars / priceTRB;
+        emit NewStakeAmount(stakeAmount);
     }
 
     /**
