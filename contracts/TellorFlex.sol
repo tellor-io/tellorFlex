@@ -13,7 +13,9 @@ import "./interfaces/IERC20.sol";
 */
 contract TellorFlex {
     IERC20 public token;
+    address public owner;
     address public governance;
+    uint256 initted;
     uint256 public stakeAmount; //amount required to be a staker
     uint256 public totalStakeAmount; //total amount of tokens locked in contract (via stake)
     uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
@@ -71,6 +73,7 @@ contract TellorFlex {
     constructor(
         address _token,
         address _governance,
+        address _owner,
         uint256 _stakeAmount,
         uint256 _reportingLock
     ) {
@@ -78,8 +81,18 @@ contract TellorFlex {
         require(_governance != address(0), "must set governance address");
         token = IERC20(_token);
         governance = _governance;
+        owner = _owner;
         stakeAmount = _stakeAmount;
         reportingLock = _reportingLock;
+    }
+
+    function init(address _governanceAddress) external {
+        require(msg.sender == owner);
+        require(initted == 0);
+
+        governance = _governanceAddress;
+        initted = 1;
+
     }
 
     /**
