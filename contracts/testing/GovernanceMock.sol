@@ -25,18 +25,6 @@ contract GovernanceMock {
         voted[msg.sender][_disputeId] = true;
     }
 
-    function changeGovernanceAddress(address _a) public {
-        tellor.changeGovernanceAddress(_a);
-    }
-
-    function changeReportingLock(uint256 _lockTime) public {
-        tellor.changeReportingLock(_lockTime);
-    }
-
-    function changeStakeAmount(uint256 _amount) public {
-        tellor.changeStakeAmount(_amount);
-    }
-
     function getVoteTallyByAddress(address _voter) public view returns (uint256) {
         return voteTallyByAddress[_voter];
     }

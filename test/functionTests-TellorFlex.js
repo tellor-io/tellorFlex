@@ -66,35 +66,6 @@ describe("TellorFlex Function Tests", function() {
 		expect(reportingLock).to.equal(REPORTING_LOCK)
 	});
 
-	it("changeGovernanceAddress", async function() {
-		let governanceAddress = await tellor.getGovernanceAddress()
-		expect(governanceAddress).to.equal(governance.address)
-		await h.expectThrow(tellor.connect(accounts[1]).changeGovernanceAddress(accounts[1].address)) // Only governance can change gov address
-		await governance.changeGovernanceAddress(accounts[1].address)
-		governanceAddress = await tellor.getGovernanceAddress()
-		expect(governanceAddress).to.equal(accounts[1].address)
-		await h.expectThrow(tellor.connect(accounts[0]).changeGovernanceAddress(accounts[0].address)) // Only governance can change gov address
-		await tellor.connect(accounts[1]).changeGovernanceAddress(accounts[0].address)
-	});
-
-	it("changeReportingLock", async function() {
-		let reportingLock = await tellor.getReportingLock()
-		expect(reportingLock).to.equal(REPORTING_LOCK)
-		await h.expectThrow(tellor.connect(accounts[1]).changeReportingLock(60)) // Only governance can change reportingLock
-		await governance.changeReportingLock(60)
-		reportingLock = await tellor.getReportingLock()
-		expect(reportingLock).to.equal(60)
-	})
-
-	it.only("changeStakeAmount", async function() {
-		let stakeAmount = await tellor.getStakeAmount()
-		expect(stakeAmount).to.equal(STAKE_AMOUNT)
-		await h.expectThrow(tellor.connect(accounts[1]).changeStakeAmount(web3.utils.toWei("1000"))) // Only governance can change reportingLock
-		await governance.changeStakeAmount(web3.utils.toWei("1000"))
-		stakeAmount = await tellor.getStakeAmount()
-		expect(stakeAmount).to.equal(web3.utils.toWei("1000"))
-	})
-
 	it("depositStake", async function() {
 		expect(await token.balanceOf(accounts[1].address)).to.equal(web3.utils.toWei("1000"))
 		expect(await token.balanceOf(accounts[2].address)).to.equal(0)
