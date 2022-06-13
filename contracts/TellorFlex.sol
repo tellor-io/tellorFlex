@@ -122,7 +122,8 @@ contract TellorFlex {
             _newStakeAmountDollars > 0,
             "stake amount must be greater than zero"
         );
-        uint256 priceTRB = getCurrentValue(_queryId);
+        bytes memory val = retrieveData(_queryId, block.timestamp - 12 hours);
+        uint256 priceTRB = abi.decode(val, (uint256));
         stakeAmount = _newStakeAmountDollars / priceTRB;
         emit NewStakeAmount(stakeAmount);
     }
@@ -578,7 +579,7 @@ contract TellorFlex {
      * @return bytes value for timestamp submitted
      */
     function retrieveData(bytes32 _queryId, uint256 _timestamp)
-        external
+        public
         view
         returns (bytes memory)
     {
