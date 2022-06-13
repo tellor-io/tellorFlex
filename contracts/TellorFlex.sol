@@ -89,6 +89,10 @@ contract TellorFlex {
     function init(address _governanceAddress) external {
         require(msg.sender == owner);
         require(initted == 0);
+        require(
+            _governanceAddress != address(0),
+            "governance address can't be zero address"
+        );
 
         governance = _governanceAddress;
         initted = 1;

@@ -8,17 +8,20 @@ describe("TellorFlex", function() {
 	let tellor;
 	let token;
 	let accounts;
+	let owner;
 	const STAKE_AMOUNT = web3.utils.toWei("10");
 	const REPORTING_LOCK = 43200; // 12 hours
 	const QUERYID1 = h.uintTob32(1)
 
+
 	beforeEach(async function () {
 		accounts = await ethers.getSigners();
+		owner = accounts[1]
 		const ERC20 = await ethers.getContractFactory("StakingToken");
 		token = await ERC20.deploy();
 		await token.deployed();
 		const TellorFlex = await ethers.getContractFactory("TellorFlex");
-		tellor = await TellorFlex.deploy(token.address, accounts[0].address, STAKE_AMOUNT, REPORTING_LOCK);
+		tellor = await TellorFlex.deploy(token.address, accounts[0].address, owner.address, STAKE_AMOUNT, REPORTING_LOCK);
 		await tellor.deployed();
 		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
 		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
@@ -34,6 +37,31 @@ describe("TellorFlex", function() {
 		let reportingLock = await tellor.getReportingLock()
 		expect(reportingLock).to.equal(REPORTING_LOCK)
 	});
+
+	it("init", async function() {
+
+		let newGovernance = accounts[1].address
+
+		//require 1: only owner can init governance
+		await expect(
+			tellor.connect(accounts[5]).init(newGovernance),
+			"rando account was able to init tellorflex"
+		).to.be.reverted
+
+		//require 3: governance can't be zero address
+		await expect(
+			tellor.connect(owner).init(0),
+			"init was able to set governance to 0 address"
+		).to.be.reverted
+
+		//require 2: can't init twice
+		await tellor.connect(owner).init(newGovernance)
+		await expect(
+			tellor.connect(owner).init(newGovernance),
+			"init was able to be called twice"
+		).to.be.reverted
+
+	})
 
 	it("changeGovernanceAddress", async function() {
 		let governanceAddress = await tellor.getGovernanceAddress()

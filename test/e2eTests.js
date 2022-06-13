@@ -13,6 +13,7 @@ describe("TellorFlex e2e Tests", function() {
 	let accounts;
 	const STAKE_AMOUNT = web3.utils.toWei("10");
 	const REPORTING_LOCK = 43200; // 12 hours
+    const DEV_WALLET = "0x39E419bA25196794B595B2a595Ea8E527ddC9856"
 
 	beforeEach(async function () {
 		accounts = await ethers.getSigners();
@@ -20,7 +21,7 @@ describe("TellorFlex e2e Tests", function() {
 		token = await ERC20.deploy();
 		await token.deployed();
 		const TellorFlex = await ethers.getContractFactory("TellorFlex");
-		tellor = await TellorFlex.deploy(token.address, accounts[0].address, STAKE_AMOUNT, REPORTING_LOCK);
+		tellor = await TellorFlex.deploy(token.address, accounts[0].address, DEV_WALLET, STAKE_AMOUNT, REPORTING_LOCK);
 		await tellor.deployed();
 		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
         await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
