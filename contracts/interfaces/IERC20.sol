@@ -13,4 +13,6 @@ interface IERC20 {
         address recipient,
         uint256 amount
     ) external returns (bool);
+
+    function mintToOracle() external;
 }
