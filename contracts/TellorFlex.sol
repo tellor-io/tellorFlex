@@ -14,9 +14,11 @@ import "hardhat/console.sol";
  * account or a contract, allowing for a flexible, modular design.
 */
 contract TellorFlex {
+
     // Storage
     IERC20 public token;
     address public governance;
+    uint256 public timeBasedReward = 5e17;
     uint256 public stakeAmount; //amount required to be a staker
     uint256 public totalStakeAmount; //total amount of tokens locked in contract (via stake)
     uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
@@ -26,9 +28,11 @@ contract TellorFlex {
     uint256 public timeOfLastAllocation;
     uint256 public totalRewardDebt;
     uint256 public stakingRewardsBalance;
+    uint256 public totalTimeBasedRewardsStaked; // amount of TBR deposited into Tellor Flex
 
     mapping(bytes32 => Report) private reports; // mapping of query IDs to a report
     mapping(address => StakeInfo) stakerDetails; //mapping from a persons address to their staking info
+    mapping(bytes32 => uint256) lockedTokenPartitions;
 
     // Structs
     struct Report {
@@ -130,6 +134,7 @@ contract TellorFlex {
         }
         _updateStakeAndPayRewards(msg.sender, _staker.stakedBalance + _amount);
         _staker.startDate = block.timestamp; // This resets the staker start date to now
+
         emit NewStaker(msg.sender, _amount);
     }
 
@@ -255,6 +260,15 @@ contract TellorFlex {
         rep.timestampToBlockNum[block.timestamp] = block.number;
         rep.valueByTimestamp[block.timestamp] = _value;
         rep.reporterByTimestamp[block.timestamp] = msg.sender;
+        // Disperse Time Based Reward
+        uint256 _timeDiff = block.timestamp - timeOfLastNewValue;
+        uint256 _reward = (_timeDiff * timeBasedReward) / 300; //.5 TRB per 5 minutes
+        console.log("time based reward: ", _reward);
+        console.log("trb balance of contract before", token.balanceOf(address(this)));
+        if (_reward > 0 && totalTimeBasedRewardsStaked > _reward) {
+            token.transfer(msg.sender, _reward);
+            totalTimeBasedRewardsStaked -= _reward;
+        }
         // Update last oracle value and number of values submitted by a reporter
         timeOfLastNewValue = block.timestamp;
         _staker.reportsSubmitted++;
@@ -266,7 +280,8 @@ contract TellorFlex {
             _nonce,
             _queryData,
             msg.sender
-        );
+        );        
+
     }
 
     /**
@@ -591,6 +606,7 @@ contract TellorFlex {
             token.transfer(msg.sender, _pendingReward);
             totalRewardDebt -= _staker.rewardDebt;
             totalStakeAmount -= _staker.stakedBalance;
+
         }
         _staker.stakedBalance = _newStakedBalance;
         _staker.rewardDebt = _staker.stakedBalance * accumulatedRewardPerShare / 1e18;

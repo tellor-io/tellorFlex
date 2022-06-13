@@ -261,4 +261,52 @@ describe("TellorFlex e2e Tests", function() {
             await tellor.connect(accounts[i]).withdrawStake()
         }
     })
+
+    it("TBR should not borrow from staking rewards", async function() {
+
+        //mint balance
+        await token.mint(accounts[0].address, web3.utils.toWei("1000"))
+
+        //stake reporter (add 10 TRB stake to contract balance)
+        await token.connect(accounts[0]).approve(tellor.address, h.toWei("1000"))
+        await tellor.connect(accounts[0]).depositStake(h.toWei("10"))
+
+        //add staking rewards: 150 TRB
+        await tellor.connect(accounts[0]).addStakingRewards(h.toWei("150"))
+
+        //TRB balance of flex should be 160 TRB
+        expect(
+            await token.balanceOf(tellor.address)).to.equal(
+            h.toWei("160"), //staking rewards + stake
+            "unexpected TRB balance in flex"
+        )
+
+        //stakingRewardsBalance should be 150
+        expect(
+            await tellor.stakingRewardsBalance()).to.equal(
+            h.toWei("150"),
+            "stakingRewardsBalance does not equal balance deposited"
+        )
+
+        //skip deposit of Time based rewards
+
+        //fast forward 1 day (this should be worth 144 tokens)
+        await h.advanceTime(86400)
+
+        //submit value should not disperse TBR because
+        // 0 time based rewards tokens deposited
+        await tellor.connect(accounts[0]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
+
+        //TRB balance of flex should be 160 TRB
+        expect(
+            await token.balanceOf(tellor.address)).to.equal(
+            h.toWei("160"),
+            "time based rewards in flex borrowed from staking rewards"
+        )
+
+
+        //stakingRewardsBalance should still be 150
+
+        //call claim staking rewards
+    })
 })
