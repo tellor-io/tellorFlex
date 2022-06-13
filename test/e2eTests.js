@@ -13,6 +13,7 @@ describe("TellorFlex e2e Tests", function() {
     let govSigner;
 	let token;
 	let accounts;
+    let owner;
 	const STAKE_AMOUNT = web3.utils.toWei("10");
 	const REPORTING_LOCK = 43200; // 12 hours
     const REWARD_RATE_TARGET = 60 * 60 * 24 * 30; // 30 days
@@ -29,6 +30,7 @@ describe("TellorFlex e2e Tests", function() {
 
 	beforeEach(async function () {
 		accounts = await ethers.getSigners();
+        owner = accounts[0]
 		const ERC20 = await ethers.getContractFactory("StakingToken");
 		token = await ERC20.deploy();
 		await token.deployed();
@@ -36,7 +38,7 @@ describe("TellorFlex e2e Tests", function() {
         governance = await Governance.deploy();
         await governance.deployed();
 		const TellorFlex = await ethers.getContractFactory("TellorFlex");
-		tellor = await TellorFlex.deploy(token.address, governance.address, STAKE_AMOUNT, REPORTING_LOCK);
+		tellor = await TellorFlex.deploy(token.address, owner.address, STAKE_AMOUNT, REPORTING_LOCK);
 		await tellor.deployed();
         await governance.setTellorAddress(tellor.address);
 		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
@@ -47,6 +49,8 @@ describe("TellorFlex e2e Tests", function() {
         )
         govSigner = await ethers.getSigner(governance.address);
         await accounts[10].sendTransaction({to:governance.address,value:ethers.utils.parseEther("1.0")}); 
+
+        await tellor.connect(owner).init(governance.address)
 	});
     it("Staked multiple times, disputed but keeps reporting", async function() {
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("30"))

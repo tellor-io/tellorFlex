@@ -11,6 +11,7 @@ describe("TellorFlex Function Tests", function() {
 	let governance;
     let govSigner;
 	let accounts;
+	let owner;
 	const STAKE_AMOUNT = web3.utils.toWei("10");
 	const REPORTING_LOCK = 43200; // 12 hours
 	const QUERYID1 = h.uintTob32(1)
@@ -26,8 +27,10 @@ describe("TellorFlex Function Tests", function() {
 		startVoteTally: 7
 	} // getStakerInfo() indices
 
+
 	beforeEach(async function () {
 		accounts = await ethers.getSigners();
+		owner = accounts[0]
 		const ERC20 = await ethers.getContractFactory("StakingToken");
 		token = await ERC20.deploy();
 		await token.deployed();
@@ -35,7 +38,7 @@ describe("TellorFlex Function Tests", function() {
         governance = await Governance.deploy();
         await governance.deployed();
 		const TellorFlex = await ethers.getContractFactory("TellorFlex");
-		tellor = await TellorFlex.deploy(token.address, governance.address, STAKE_AMOUNT, REPORTING_LOCK);
+		tellor = await TellorFlex.deploy(token.address, owner.address, STAKE_AMOUNT, REPORTING_LOCK);
 		await tellor.deployed();
         await governance.setTellorAddress(tellor.address);
 		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
@@ -46,6 +49,10 @@ describe("TellorFlex Function Tests", function() {
         )
         govSigner = await ethers.getSigner(governance.address);
         await accounts[10].sendTransaction({to:governance.address,value:ethers.utils.parseEther("1.0")}); 
+
+        await tellor.connect(owner).init(governance.address)
+
+
 	});
 
 	it("constructor", async function() {

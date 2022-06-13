@@ -17,6 +17,7 @@ contract TellorFlex {
 
     // Storage
     IERC20 public token;
+    address public owner;
     address public governance;
     uint256 public timeBasedReward = 5e17;
     uint256 public stakeAmount; //amount required to be a staker
@@ -81,22 +82,31 @@ contract TellorFlex {
     /**
      * @dev Initializes system parameters
      * @param _token address of token used for staking
-     * @param _governance address which controls system
      * @param _stakeAmount amount of token needed to report oracle values
      * @param _reportingLock base amount of time (seconds) before reporter is able to report again
      */
     constructor(
         address _token,
-        address _governance,
+        address _owner,
         uint256 _stakeAmount,
         uint256 _reportingLock
     ) {
         require(_token != address(0), "must set token address");
-        require(_governance != address(0), "must set governance address");
         token = IERC20(_token);
-        governance = _governance;
+        owner = _owner;
         stakeAmount = _stakeAmount;
         reportingLock = _reportingLock;
+    }
+
+    function init(address _governanceAddress) external {
+        require(msg.sender == owner);
+        require(governance == address(0));
+        require(
+            _governanceAddress != address(0),
+            "governance address can't be zero address"
+        );
+
+        governance = _governanceAddress;
     }
 
     function addStakingRewards(uint256 _amount) external {
@@ -625,4 +635,5 @@ contract TellorFlex {
         } 
         return _newAccumulatedRewardPerShare;
     }
+
 }
