@@ -29,7 +29,7 @@ contract TellorFlex {
     uint256 public timeOfLastAllocation;
     uint256 public totalRewardDebt;
     uint256 public stakingRewardsBalance;
-    uint256 public totalTimeBasedRewardsStaked; // amount of TBR deposited into Tellor Flex
+    uint256 public totalTimeBasedRewardsBalance; // amount of TBR deposited into Tellor Flex
 
     mapping(bytes32 => Report) private reports; // mapping of query IDs to a report
     mapping(address => StakeInfo) stakerDetails; //mapping from a persons address to their staking info
@@ -273,11 +273,9 @@ contract TellorFlex {
         // Disperse Time Based Reward
         uint256 _timeDiff = block.timestamp - timeOfLastNewValue;
         uint256 _reward = (_timeDiff * timeBasedReward) / 300; //.5 TRB per 5 minutes
-        console.log("time based reward: ", _reward);
-        console.log("trb balance of contract before", token.balanceOf(address(this)));
-        if (_reward > 0 && totalTimeBasedRewardsStaked > _reward) {
+        if (_reward > 0 && totalTimeBasedRewardsBalance > _reward) {
             token.transfer(msg.sender, _reward);
-            totalTimeBasedRewardsStaked -= _reward;
+            totalTimeBasedRewardsBalance -= _reward;
         }
         // Update last oracle value and number of values submitted by a reporter
         timeOfLastNewValue = block.timestamp;
@@ -292,6 +290,10 @@ contract TellorFlex {
             msg.sender
         );        
 
+    }
+
+    function updateTotalTimeBasedRewardsBalance() external {
+        totalTimeBasedRewardsBalance = token.balanceOf(address(this)) - (totalStakeAmount + stakingRewardsBalance);
     }
 
     /**
