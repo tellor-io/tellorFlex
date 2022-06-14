@@ -220,6 +220,7 @@ contract TellorFlex {
             "zero staker balance"
         );
         uint256 _slashAmount;
+        _updateStakeAmount();
         if (_staker.lockedBalance >= stakeAmount) {
             _slashAmount = stakeAmount;
             _staker.lockedBalance -= stakeAmount;
@@ -261,6 +262,7 @@ contract TellorFlex {
             "nonce must match timestamp index"
         );
         StakeInfo storage _staker = stakerDetails[msg.sender];
+        _updateStakeAmount();
         require(
             _staker.stakedBalance >= stakeAmount,
             "balance must be greater than stake amount"
@@ -612,7 +614,7 @@ contract TellorFlex {
     // *                                                                           *
     // *****************************************************************************
 
-    function _getStakeAmount() internal {
+    function _updateStakeAmount() internal {
         bytes memory val = retrieveData(
             trbUsdSpotPriceQueryId,
             block.timestamp - 12 hours
