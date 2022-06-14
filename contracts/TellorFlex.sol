@@ -87,13 +87,12 @@ contract TellorFlex {
      */
     constructor(
         address _token,
-        address _owner,
         uint256 _stakeAmount,
         uint256 _reportingLock
     ) {
         require(_token != address(0), "must set token address");
         token = IERC20(_token);
-        owner = _owner;
+        owner = msg.sender;
         stakeAmount = _stakeAmount;
         reportingLock = _reportingLock;
     }
@@ -273,8 +272,6 @@ contract TellorFlex {
         // Disperse Time Based Reward
         uint256 _timeDiff = block.timestamp - timeOfLastNewValue;
         uint256 _reward = (_timeDiff * timeBasedReward) / 300; //.5 TRB per 5 minutes
-        console.log("time based reward: ", _reward);
-        console.log("trb balance of contract before", token.balanceOf(address(this)));
         if (_reward > 0 && totalTimeBasedRewardsStaked > _reward) {
             token.transfer(msg.sender, _reward);
             totalTimeBasedRewardsStaked -= _reward;

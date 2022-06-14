@@ -26,8 +26,9 @@ describe("TellorFlex Function Tests -- Init Fn", function() {
         governance = await Governance.deploy();
         await governance.deployed();
 		const TellorFlex = await ethers.getContractFactory("TellorFlex");
-		tellor = await TellorFlex.deploy(token.address, owner.address, STAKE_AMOUNT, REPORTING_LOCK);
-		await tellor.deployed();
+		tellor = await TellorFlex.deploy(token.address, STAKE_AMOUNT, REPORTING_LOCK);
+		owner = await ethers.getSigner(await tellor.owner())
+        await tellor.deployed();
         await governance.setTellorAddress(tellor.address);
 		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
         await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
