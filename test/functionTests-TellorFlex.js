@@ -12,8 +12,9 @@ describe("TellorFlex Function Tests", function() {
     let govSigner;
 	let accounts;
 	let owner;
-	const STAKE_AMOUNT_USD_TARGET = 100;
+	const STAKE_AMOUNT_USD_TARGET = 200;
     const PRICE_TRB = 50;
+	const REQUIRED_STAKE = web3.utils.toWei((STAKE_AMOUNT_USD_TARGET / PRICE_TRB).toString());
 	const REPORTING_LOCK = 43200; // 12 hours
 	const QUERYID1 = h.uintTob32(1)
 	const REWARD_RATE_TARGET = 60 * 60 * 24 * 30; // 30 days
@@ -57,7 +58,7 @@ describe("TellorFlex Function Tests", function() {
 
 	it("constructor", async function() {
 		let stakeAmount = await tellor.getStakeAmount()
-		expect(stakeAmount).to.equal(STAKE_AMOUNT)
+		expect(stakeAmount).to.equal(REQUIRED_STAKE);
 		let governanceAddress = await tellor.getGovernanceAddress()
 		expect(governanceAddress).to.equal(governance.address)
 		let tokenAddress = await tellor.getTokenAddress()
@@ -97,7 +98,7 @@ describe("TellorFlex Function Tests", function() {
 
 	it("removeValue", async function() {
 		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
-		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
+		await tellor.connect(accounts[1]).depositStake(REQUIRED_STAKE)
 		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
 		let blocky = await h.getBlock()
 		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(1)
