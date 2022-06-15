@@ -377,7 +377,7 @@ contract TellorFlex {
      * @return uint256 count of the number of values received for the id
      */
     function getNewValueCountbyQueryId(bytes32 _queryId)
-        external
+        public
         view
         returns (uint256)
     {
@@ -554,11 +554,75 @@ contract TellorFlex {
      * @return uint256 timestamp
      */
     function getTimestampbyQueryIdandIndex(bytes32 _queryId, uint256 _index)
-        external
+        public
         view
         returns (uint256)
     {
         return reports[_queryId].timestamps[_index];
+    }
+
+    /**
+     * @dev Retrieves latest array index of data before the specified timestamp for the queryId
+     * @param _queryId is the queryId to look up the index for
+     * @param _timestamp is the timestamp before which to search for the latest index
+     * @return _found whether the index was found
+     * @return _index the latest index found before the specified timestamp
+     */
+    // slither-disable-next-line calls-loop
+    function getIndexForDataBefore(bytes32 _queryId, uint256 _timestamp)
+        public
+        view
+        returns (bool _found, uint256 _index)
+    {
+        uint256 _count = getNewValueCountbyQueryId(_queryId);
+
+        if (_count > 0) {
+            uint256 middle;
+            uint256 start = 0;
+            uint256 end = _count - 1;
+            uint256 _time;
+
+            //Checking Boundaries to short-circuit the algorithm
+            _time = getTimestampbyQueryIdandIndex(_queryId, start);
+            if (_time >= _timestamp) return (false, 0);
+            _time = getTimestampbyQueryIdandIndex(_queryId, end);
+            if (_time < _timestamp) return (true, end);
+
+            //Since the value is within our boundaries, do a binary search
+            while (true) {
+                middle = (end - start) / 2 + 1 + start;
+                _time = getTimestampbyQueryIdandIndex(_queryId, middle);
+                if (_time < _timestamp) {
+                    //get immediate next value
+                    uint256 _nextTime = getTimestampbyQueryIdandIndex(
+                        _queryId,
+                        middle + 1
+                    );
+                    if (_nextTime >= _timestamp) {
+                        //_time is correct
+                        return (true, middle);
+                    } else {
+                        //look from middle + 1(next value) to end
+                        start = middle + 1;
+                    }
+                } else {
+                    uint256 _prevTime = getTimestampbyQueryIdandIndex(
+                        _queryId,
+                        middle - 1
+                    );
+                    if (_prevTime < _timestamp) {
+                        // _prevtime is correct
+                        return (true, middle - 1);
+                    } else {
+                        //look from start to middle -1(prev value)
+                        end = middle - 1;
+                    }
+                }
+                //We couldn't find a value
+                //if(middle - 1 == start || middle == _count) return (false, 0);
+            }
+        }
+        return (false, 0);
     }
 
     /**
@@ -573,6 +637,35 @@ contract TellorFlex {
         returns (uint256)
     {
         return reports[_queryId].timestampIndex[_timestamp];
+    }
+
+    /**
+     * @dev Retrieves the latest value for the queryId before the specified timestamp
+     * @param _queryId is the queryId to look up the value for
+     * @param _timestamp before which to search for latest value
+     * @return _ifRetrieve bool true if able to retrieve a non-zero value
+     * @return _value the value retrieved
+     * @return _timestampRetrieved the value's timestamp
+     */
+    function getDataBefore(bytes32 _queryId, uint256 _timestamp)
+        public
+        view
+        returns (
+            bool _ifRetrieve,
+            bytes memory _value,
+            uint256 _timestampRetrieved
+        )
+    {
+        (bool _found, uint256 _index) = getIndexForDataBefore(
+            _queryId,
+            _timestamp
+        );
+        if (!_found) return (false, bytes(""), 0);
+        uint256 _time = getTimestampbyQueryIdandIndex(_queryId, _index);
+        _value = retrieveData(_queryId, _time);
+        if (keccak256(_value) != keccak256(bytes("")))
+            return (true, _value, _time);
+        return (false, bytes(""), 0);
     }
 
     /**
@@ -612,13 +705,15 @@ contract TellorFlex {
     // *****************************************************************************
 
     function _updateStakeAmount() internal {
-        bytes memory val = retrieveData(
+        (bool valFound, bytes memory val, uint256 timestamp) = getDataBefore(
             trbUsdSpotPriceQueryId,
             block.timestamp - 12 hours
         );
-        uint256 priceTRB = abi.decode(val, (uint256));
-        stakeAmount = (stakeAmountDollarTarget / priceTRB) * 10**18;
-        emit NewStakeAmount(stakeAmount);
+        if (valFound) {
+            uint256 priceTRB = abi.decode(val, (uint256));
+            stakeAmount = (stakeAmountDollarTarget / priceTRB) * 10**18;
+            emit NewStakeAmount(stakeAmount);
+        }
     }
 
     function _updateRewards() internal {
