@@ -13,10 +13,10 @@ describe("TellorFlex e2e Tests", function() {
     let govSigner;
 	let token;
 	let accounts;
-	const STAKE_AMOUNT_USD_TARGET = 100;
-    const PRICE_TRB = 50;
     let owner;
-	const STAKE_AMOUNT = web3.utils.toWei("10");
+	const STAKE_AMOUNT_USD_TARGET = 500;
+    const PRICE_TRB = 50;
+	// const REQUIRED_STAKE = web3.utils.toWei((STAKE_AMOUNT_USD_TARGET / PRICE_TRB).toString());
 	const REPORTING_LOCK = 43200; // 12 hours
     const REWARD_RATE_TARGET = 60 * 60 * 24 * 30; // 30 days
     const smap = {
@@ -85,49 +85,6 @@ describe("TellorFlex e2e Tests", function() {
         await tellor.connect(govSigner).removeValue(h.uintTob32(1), blocky.timestamp)
         await tellor.connect(govSigner).slashReporter(accounts[1].address, accounts[2].address)
 		await h.expectThrow(tellor.connect(accounts[1]).withdrawStake()) // 7 days didn't pass
-    })
-    it("Increase reporter lock time", async function() {
-        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
-        let reportingLock = await tellor.getReportingLock()
-		expect(reportingLock).to.equal(REPORTING_LOCK)
-		await tellor.changeReportingLock(86400)
-		reportingLock = await tellor.getReportingLock()
-		expect(reportingLock).to.equal(86400)
-        await h.advanceTime(86400/2)
-        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x'))
-        await h.advanceTime(86420/2)
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
-    })
-    it("Check increasing stake amount in future", async function() {
-        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
-        let stakeAmount = await tellor.getStakeAmount()
-		expect(stakeAmount).to.equal(STAKE_AMOUNT_USD / PRICE_TRB)
-    	await tellor.changeStakeAmount(web3.utils.toWei("1000"))
-		stakeAmount = await tellor.getStakeAmount()
-		expect(stakeAmount).to.equal(web3.utils.toWei("1000"))
-        await h.advanceTime(86400/2)
-        h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x'))
-        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("990"))
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 1, '0x')
-
-    })
-    it("Check updating stake amount base on price of TRB in USD", async function() {
-        // submit value for price of TRB using query id
-        // change query id to be actual query id of TRB/USD spot price
-        let newTrbPrice = web3.utils.toWei("70")
-        let newStakeAmountDollars = 35
-        let trbUsdSpotPriceQueryId = h.uintTob32(2)
-        await tellor.connect(accounts[1]).depositStake(STAKE_AMOUNT_USD / PRICE_TRB)
-        await tellor.connect(accounts[1]).submitValue(trbUsdSpotPriceQueryId, h.bytes(newTrbPrice), 0, '0x')
-        
-        // call changeStakeAmountDollars
-        await tellor.changeStakeAmountDollars(newStakeAmountDollars, trbUsdSpotPriceQueryId)
-
-        // check that stake amount is updated
-        let stakeAmount = await tellor.getStakeAmount()
-        expect(stakeAmount).to.equal(newStakeAmountDollars / newTrbPrice)
     })
     it("Mine 2 values on 50 different ID's", async function() {
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
