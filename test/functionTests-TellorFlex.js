@@ -39,7 +39,7 @@ describe("TellorFlex Function Tests", function() {
         governance = await Governance.deploy();
         await governance.deployed();
 		const TellorFlex = await ethers.getContractFactory("TellorFlex");
-		tellor = await TellorFlex.deploy(token.address, owner.address, STAKE_AMOUNT_USD_TARGET, PRICE_TRB, owner.address, REPORTING_LOCK);
+		tellor = await TellorFlex.deploy(token.address, owner.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB);
 		await tellor.deployed();
         await governance.setTellorAddress(tellor.address);
 		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
@@ -48,12 +48,11 @@ describe("TellorFlex Function Tests", function() {
             method: "hardhat_impersonateAccount",
             params: [governance.address]}
         )
+
         govSigner = await ethers.getSigner(governance.address);
         await accounts[10].sendTransaction({to:governance.address,value:ethers.utils.parseEther("1.0")}); 
 
         await tellor.connect(owner).init(governance.address)
-
-
 	});
 
 	it("constructor", async function() {
