@@ -97,15 +97,11 @@ describe("TellorFlex Function Tests", function() {
 	})
 
 	it("removeValue", async function() {
-		console.log("starting remove value")
 		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
 		await tellor.connect(accounts[1]).depositStake(REQUIRED_STAKE)
-		console.log("deposited stake")
 		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
-		console.log("submitted value")
 		let blocky = await h.getBlock()
 		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(1)
-		console.log("SUP BOI")
 		await h.expectThrow(tellor.connect(govSigner).removeValue(QUERYID1, 500)) // invalid value
 		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.bytes(100))
 		await h.expectThrow(tellor.connect(accounts[1]).removeValue(QUERYID1, blocky.timestamp)) // only gov can removeValue
