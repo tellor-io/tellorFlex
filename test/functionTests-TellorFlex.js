@@ -12,7 +12,7 @@ describe("TellorFlex Function Tests", function() {
     let govSigner;
 	let accounts;
 	let owner;
-	const STAKE_AMOUNT_USD_TARGET = 200;
+	const STAKE_AMOUNT_USD_TARGET = 500;
     const PRICE_TRB = 50;
 	const REQUIRED_STAKE = web3.utils.toWei((STAKE_AMOUNT_USD_TARGET / PRICE_TRB).toString());
 	const REPORTING_LOCK = 43200; // 12 hours
