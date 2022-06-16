@@ -12,7 +12,9 @@ describe("TellorFlex Function Tests", function() {
     let govSigner;
 	let accounts;
 	let owner;
-	const STAKE_AMOUNT = web3.utils.toWei("10");
+	const STAKE_AMOUNT_USD_TARGET = 500;
+    const PRICE_TRB = 50;
+	const REQUIRED_STAKE = web3.utils.toWei((STAKE_AMOUNT_USD_TARGET / PRICE_TRB).toString());
 	const REPORTING_LOCK = 43200; // 12 hours
 	const QUERYID1 = h.uintTob32(1)
 	const REWARD_RATE_TARGET = 60 * 60 * 24 * 30; // 30 days
@@ -38,7 +40,7 @@ describe("TellorFlex Function Tests", function() {
         governance = await Governance.deploy();
         await governance.deployed();
 		const TellorFlex = await ethers.getContractFactory("TellorFlex");
-		tellor = await TellorFlex.deploy(token.address, STAKE_AMOUNT, REPORTING_LOCK);
+		tellor = await TellorFlex.deploy(token.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB);
 		owner = await ethers.getSigner(await tellor.owner())
 		await tellor.deployed();
         await governance.setTellorAddress(tellor.address);
@@ -48,17 +50,16 @@ describe("TellorFlex Function Tests", function() {
             method: "hardhat_impersonateAccount",
             params: [governance.address]}
         )
+
         govSigner = await ethers.getSigner(governance.address);
         await accounts[10].sendTransaction({to:governance.address,value:ethers.utils.parseEther("1.0")}); 
 
         await tellor.connect(owner).init(governance.address)
-
-
 	});
 
 	it("constructor", async function() {
 		let stakeAmount = await tellor.getStakeAmount()
-		expect(stakeAmount).to.equal(STAKE_AMOUNT)
+		expect(stakeAmount).to.equal(REQUIRED_STAKE);
 		let governanceAddress = await tellor.getGovernanceAddress()
 		expect(governanceAddress).to.equal(governance.address)
 		let tokenAddress = await tellor.getTokenAddress()
@@ -98,7 +99,7 @@ describe("TellorFlex Function Tests", function() {
 
 	it("removeValue", async function() {
 		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
-		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
+		await tellor.connect(accounts[1]).depositStake(REQUIRED_STAKE)
 		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
 		let blocky = await h.getBlock()
 		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(1)
@@ -341,7 +342,7 @@ describe("TellorFlex Function Tests", function() {
 	})
 
 	it("getStakeAmount", async function() {
-		expect(await tellor.getStakeAmount()).to.equal(STAKE_AMOUNT)
+		expect(await tellor.getStakeAmount()).to.equal(REQUIRED_STAKE)
 	})
 
 	it("getStakerInfo", async function() {

@@ -14,13 +14,15 @@ import "hardhat/console.sol";
  * account or a contract, allowing for a flexible, modular design.
 */
 contract TellorFlex {
-
     // Storage
     IERC20 public token;
     address public owner;
     address public governance;
     uint256 public timeBasedReward = 5e17;
     uint256 public stakeAmount; //amount required to be a staker
+    uint256 public stakeAmountDollarTarget; // amount of US dollars required to be a staker
+    bytes32 public trbUsdSpotPriceQueryId =
+        keccak256(abi.encode("SpotPrice", abi.encode("trb", "usd")));
     uint256 public totalStakeAmount; //total amount of tokens locked in contract (via stake)
     uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
     uint256 public timeOfLastNewValue = block.timestamp; // time of the last new submitted value, originally set to the block timestamp
@@ -29,7 +31,7 @@ contract TellorFlex {
     uint256 public timeOfLastAllocation;
     uint256 public totalRewardDebt;
     uint256 public stakingRewardsBalance;
-    uint256 public totalTimeBasedRewardsStaked; // amount of TBR deposited into Tellor Flex
+    uint256 public totalTimeBasedRewardsBalance; // amount of TBR deposited into Tellor Flex
 
     mapping(bytes32 => Report) private reports; // mapping of query IDs to a report
     mapping(address => StakeInfo) stakerDetails; //mapping from a persons address to their staking info
@@ -82,19 +84,22 @@ contract TellorFlex {
     /**
      * @dev Initializes system parameters
      * @param _token address of token used for staking
-     * @param _stakeAmount amount of token needed to report oracle values
      * @param _reportingLock base amount of time (seconds) before reporter is able to report again
+     * @param _stakeAmountDollarTarget fixed amount of dollars that TRB stake amount is worth
+     * @param _priceTRB price of TRB in USD
      */
     constructor(
         address _token,
-        uint256 _stakeAmount,
-        uint256 _reportingLock
+        uint256 _reportingLock,
+        uint256 _stakeAmountDollarTarget,
+        uint256 _priceTRB
     ) {
         require(_token != address(0), "must set token address");
         token = IERC20(_token);
         owner = msg.sender;
-        stakeAmount = _stakeAmount;
         reportingLock = _reportingLock;
+        stakeAmountDollarTarget = _stakeAmountDollarTarget;
+        stakeAmount = (_stakeAmountDollarTarget / _priceTRB) * 10**18;
     }
 
     function init(address _governanceAddress) external {
@@ -112,7 +117,12 @@ contract TellorFlex {
         require(token.transferFrom(msg.sender, address(this), _amount));
         _updateRewards();
         stakingRewardsBalance += _amount;
-        rewardRate = (stakingRewardsBalance - (accumulatedRewardPerShare * totalStakeAmount / 1e18 - totalRewardDebt)) / 30 days;
+        rewardRate =
+            (stakingRewardsBalance -
+                ((accumulatedRewardPerShare * totalStakeAmount) /
+                    1e18 -
+                    totalRewardDebt)) /
+            30 days;
     }
 
     /**
@@ -135,9 +145,10 @@ contract TellorFlex {
                 _staker.lockedBalance = 0;
             }
         } else {
-            if(_staker.stakedBalance == 0) {
+            if (_staker.stakedBalance == 0) {
                 _staker.startVoteCount = IGovernance(governance).getVoteCount();
-                _staker.startVoteTally = IGovernance(governance).getVoteTallyByAddress(msg.sender);
+                _staker.startVoteTally = IGovernance(governance)
+                    .getVoteTallyByAddress(msg.sender);
             }
             require(token.transferFrom(msg.sender, address(this), _amount));
         }
@@ -205,6 +216,7 @@ contract TellorFlex {
             "zero staker balance"
         );
         uint256 _slashAmount;
+        _updateStakeAmount();
         if (_staker.lockedBalance >= stakeAmount) {
             _slashAmount = stakeAmount;
             _staker.lockedBalance -= stakeAmount;
@@ -212,7 +224,10 @@ contract TellorFlex {
             _staker.lockedBalance + _staker.stakedBalance >= stakeAmount
         ) {
             _slashAmount = stakeAmount;
-            _updateStakeAndPayRewards(_reporter, _staker.stakedBalance - (stakeAmount - _staker.lockedBalance));
+            _updateStakeAndPayRewards(
+                _reporter,
+                _staker.stakedBalance - (stakeAmount - _staker.lockedBalance)
+            );
             _staker.lockedBalance = 0;
         } else {
             _slashAmount = _staker.stakedBalance + _staker.lockedBalance;
@@ -243,6 +258,7 @@ contract TellorFlex {
             "nonce must match timestamp index"
         );
         StakeInfo storage _staker = stakerDetails[msg.sender];
+        _updateStakeAmount();
         require(
             _staker.stakedBalance >= stakeAmount,
             "balance must be greater than stake amount"
@@ -272,9 +288,9 @@ contract TellorFlex {
         // Disperse Time Based Reward
         uint256 _timeDiff = block.timestamp - timeOfLastNewValue;
         uint256 _reward = (_timeDiff * timeBasedReward) / 300; //.5 TRB per 5 minutes
-        if (_reward > 0 && totalTimeBasedRewardsStaked > _reward) {
+        if (_reward > 0 && totalTimeBasedRewardsBalance > _reward) {
             token.transfer(msg.sender, _reward);
-            totalTimeBasedRewardsStaked -= _reward;
+            totalTimeBasedRewardsBalance -= _reward;
         }
         // Update last oracle value and number of values submitted by a reporter
         timeOfLastNewValue = block.timestamp;
@@ -287,8 +303,11 @@ contract TellorFlex {
             _nonce,
             _queryData,
             msg.sender
-        );        
+        );
+    }
 
+    function updateTotalTimeBasedRewardsBalance() external {
+        totalTimeBasedRewardsBalance = token.balanceOf(address(this)) - (totalStakeAmount + stakingRewardsBalance);
     }
 
     /**
@@ -356,7 +375,7 @@ contract TellorFlex {
      * @return uint256 count of the number of values received for the id
      */
     function getNewValueCountbyQueryId(bytes32 _queryId)
-        external
+        public
         view
         returns (uint256)
     {
@@ -368,13 +387,26 @@ contract TellorFlex {
      * @param _stakerAddress staker address to look up
      * @return uint256 pending reward for given staker
      */
-    function getPendingRewardByStaker(address _stakerAddress) external view returns (uint256) {
+    function getPendingRewardByStaker(address _stakerAddress)
+        external
+        view
+        returns (uint256)
+    {
         StakeInfo storage _staker = stakerDetails[_stakerAddress];
-        uint256 _pendingReward = _staker.stakedBalance * _getUpdatedAccumulatedRewardPerShare() / 1e18 - _staker.rewardDebt;
-        uint256 _numberOfVotes = IGovernance(governance).getVoteCount() - _staker.startVoteCount;
-        if(_numberOfVotes > 0) {
-            _pendingReward = _pendingReward * (IGovernance(governance).getVoteTallyByAddress(_stakerAddress) - _staker.startVoteTally) / _numberOfVotes;
-        }        
+        uint256 _pendingReward = (_staker.stakedBalance *
+            _getUpdatedAccumulatedRewardPerShare()) /
+            1e18 -
+            _staker.rewardDebt;
+        uint256 _numberOfVotes = IGovernance(governance).getVoteCount() -
+            _staker.startVoteCount;
+        if (_numberOfVotes > 0) {
+            _pendingReward =
+                (_pendingReward *
+                    (IGovernance(governance).getVoteTallyByAddress(
+                        _stakerAddress
+                    ) - _staker.startVoteTally)) /
+                _numberOfVotes;
+        }
         return _pendingReward;
     }
 
@@ -520,11 +552,75 @@ contract TellorFlex {
      * @return uint256 timestamp
      */
     function getTimestampbyQueryIdandIndex(bytes32 _queryId, uint256 _index)
-        external
+        public
         view
         returns (uint256)
     {
         return reports[_queryId].timestamps[_index];
+    }
+
+    /**
+     * @dev Retrieves latest array index of data before the specified timestamp for the queryId
+     * @param _queryId is the queryId to look up the index for
+     * @param _timestamp is the timestamp before which to search for the latest index
+     * @return _found whether the index was found
+     * @return _index the latest index found before the specified timestamp
+     */
+    // slither-disable-next-line calls-loop
+    function getIndexForDataBefore(bytes32 _queryId, uint256 _timestamp)
+        public
+        view
+        returns (bool _found, uint256 _index)
+    {
+        uint256 _count = getNewValueCountbyQueryId(_queryId);
+
+        if (_count > 0) {
+            uint256 middle;
+            uint256 start = 0;
+            uint256 end = _count - 1;
+            uint256 _time;
+
+            //Checking Boundaries to short-circuit the algorithm
+            _time = getTimestampbyQueryIdandIndex(_queryId, start);
+            if (_time >= _timestamp) return (false, 0);
+            _time = getTimestampbyQueryIdandIndex(_queryId, end);
+            if (_time < _timestamp) return (true, end);
+
+            //Since the value is within our boundaries, do a binary search
+            while (true) {
+                middle = (end - start) / 2 + 1 + start;
+                _time = getTimestampbyQueryIdandIndex(_queryId, middle);
+                if (_time < _timestamp) {
+                    //get immediate next value
+                    uint256 _nextTime = getTimestampbyQueryIdandIndex(
+                        _queryId,
+                        middle + 1
+                    );
+                    if (_nextTime >= _timestamp) {
+                        //_time is correct
+                        return (true, middle);
+                    } else {
+                        //look from middle + 1(next value) to end
+                        start = middle + 1;
+                    }
+                } else {
+                    uint256 _prevTime = getTimestampbyQueryIdandIndex(
+                        _queryId,
+                        middle - 1
+                    );
+                    if (_prevTime < _timestamp) {
+                        // _prevtime is correct
+                        return (true, middle - 1);
+                    } else {
+                        //look from start to middle -1(prev value)
+                        end = middle - 1;
+                    }
+                }
+                //We couldn't find a value
+                //if(middle - 1 == start || middle == _count) return (false, 0);
+            }
+        }
+        return (false, 0);
     }
 
     /**
@@ -539,6 +635,35 @@ contract TellorFlex {
         returns (uint256)
     {
         return reports[_queryId].timestampIndex[_timestamp];
+    }
+
+    /**
+     * @dev Retrieves the latest value for the queryId before the specified timestamp
+     * @param _queryId is the queryId to look up the value for
+     * @param _timestamp before which to search for latest value
+     * @return _ifRetrieve bool true if able to retrieve a non-zero value
+     * @return _value the value retrieved
+     * @return _timestampRetrieved the value's timestamp
+     */
+    function getDataBefore(bytes32 _queryId, uint256 _timestamp)
+        public
+        view
+        returns (
+            bool _ifRetrieve,
+            bytes memory _value,
+            uint256 _timestampRetrieved
+        )
+    {
+        (bool _found, uint256 _index) = getIndexForDataBefore(
+            _queryId,
+            _timestamp
+        );
+        if (!_found) return (false, bytes(""), 0);
+        uint256 _time = getTimestampbyQueryIdandIndex(_queryId, _index);
+        _value = retrieveData(_queryId, _time);
+        if (keccak256(_value) != keccak256(bytes("")))
+            return (true, _value, _time);
+        return (false, bytes(""), 0);
     }
 
     /**
@@ -564,7 +689,7 @@ contract TellorFlex {
      * @return bytes value for timestamp submitted
      */
     function retrieveData(bytes32 _queryId, uint256 _timestamp)
-        external
+        public
         view
         returns (bytes memory)
     {
@@ -577,60 +702,112 @@ contract TellorFlex {
     // *                                                                           *
     // *****************************************************************************
 
+    function _updateStakeAmount() internal {
+        (bool valFound, bytes memory val, uint256 timestamp) = getDataBefore(
+            trbUsdSpotPriceQueryId,
+            block.timestamp - 12 hours
+        );
+        if (valFound) {
+            uint256 priceTRB = abi.decode(val, (uint256));
+            stakeAmount = (stakeAmountDollarTarget / priceTRB) * 10**18;
+            emit NewStakeAmount(stakeAmount);
+        }
+    }
+
     function _updateRewards() internal {
-        if(timeOfLastAllocation == block.timestamp) {
+        if (timeOfLastAllocation == block.timestamp) {
             return;
         }
-        if(totalStakeAmount == 0) {
+        if (totalStakeAmount == 0) {
             timeOfLastAllocation = block.timestamp;
             return;
         }
-        uint256 _newAccumulatedRewardPerShare = accumulatedRewardPerShare + (block.timestamp - timeOfLastAllocation) * rewardRate * 1e18 / totalStakeAmount;
-        uint256 _accumulatedReward = _newAccumulatedRewardPerShare * totalStakeAmount / 1e18 - totalRewardDebt;
+        uint256 _newAccumulatedRewardPerShare = accumulatedRewardPerShare +
+            ((block.timestamp - timeOfLastAllocation) * rewardRate * 1e18) /
+            totalStakeAmount;
+        uint256 _accumulatedReward = (_newAccumulatedRewardPerShare *
+            totalStakeAmount) /
+            1e18 -
+            totalRewardDebt;
         if (_accumulatedReward >= stakingRewardsBalance) {
-            accumulatedRewardPerShare += (stakingRewardsBalance - (accumulatedRewardPerShare * totalStakeAmount / 1e18 - totalRewardDebt)) * 1e18 / totalStakeAmount;
-            rewardRate = 0; 
+            accumulatedRewardPerShare +=
+                ((stakingRewardsBalance -
+                    ((accumulatedRewardPerShare * totalStakeAmount) /
+                        1e18 -
+                        totalRewardDebt)) * 1e18) /
+                totalStakeAmount;
+            rewardRate = 0;
         } else {
             accumulatedRewardPerShare = _newAccumulatedRewardPerShare;
         }
         timeOfLastAllocation = block.timestamp;
     }
 
-    function _updateStakeAndPayRewards(address _stakerAddress, uint256 _newStakedBalance) internal {
+    function _updateStakeAndPayRewards(
+        address _stakerAddress,
+        uint256 _newStakedBalance
+    ) internal {
         _updateRewards();
         StakeInfo storage _staker = stakerDetails[_stakerAddress];
-        if(_staker.stakedBalance > 0) {
-            uint256 _pendingReward = _staker.stakedBalance * accumulatedRewardPerShare / 1e18 - _staker.rewardDebt;
+        if (_staker.stakedBalance > 0) {
+            uint256 _pendingReward = (_staker.stakedBalance *
+                accumulatedRewardPerShare) /
+                1e18 -
+                _staker.rewardDebt;
             uint256 _numberOfVotes;
-            (bool _success, bytes memory _returnData) = governance.call(abi.encodeWithSignature("getVoteCount()"));
-            if(_success) {
-                _numberOfVotes = uint256(abi.decode(_returnData, (uint256))) - _staker.startVoteCount;
+            (bool _success, bytes memory _returnData) = governance.call(
+                abi.encodeWithSignature("getVoteCount()")
+            );
+            if (_success) {
+                _numberOfVotes =
+                    uint256(abi.decode(_returnData, (uint256))) -
+                    _staker.startVoteCount;
             }
-            if(_numberOfVotes > 0) {
-                _pendingReward = _pendingReward * (IGovernance(governance).getVoteTallyByAddress(_stakerAddress) - _staker.startVoteTally) / _numberOfVotes;
+            if (_numberOfVotes > 0) {
+                _pendingReward =
+                    (_pendingReward *
+                        (IGovernance(governance).getVoteTallyByAddress(
+                            _stakerAddress
+                        ) - _staker.startVoteTally)) /
+                    _numberOfVotes;
             }
             stakingRewardsBalance -= _pendingReward;
             token.transfer(msg.sender, _pendingReward);
             totalRewardDebt -= _staker.rewardDebt;
             totalStakeAmount -= _staker.stakedBalance;
-
         }
         _staker.stakedBalance = _newStakedBalance;
-        _staker.rewardDebt = _staker.stakedBalance * accumulatedRewardPerShare / 1e18;
+        _staker.rewardDebt =
+            (_staker.stakedBalance * accumulatedRewardPerShare) /
+            1e18;
         totalRewardDebt += _staker.rewardDebt;
         totalStakeAmount += _staker.stakedBalance;
     }
 
-    function _getUpdatedAccumulatedRewardPerShare() internal view returns (uint256) {
-        if(totalStakeAmount == 0) {
+    function _getUpdatedAccumulatedRewardPerShare()
+        internal
+        view
+        returns (uint256)
+    {
+        if (totalStakeAmount == 0) {
             return accumulatedRewardPerShare;
         }
-        uint256 _newAccumulatedRewardPerShare = accumulatedRewardPerShare + (block.timestamp - timeOfLastAllocation) * rewardRate * 1e18 / totalStakeAmount;
-        uint256 _accumulatedReward = _newAccumulatedRewardPerShare * totalStakeAmount / 1e18 - totalRewardDebt;
+        uint256 _newAccumulatedRewardPerShare = accumulatedRewardPerShare +
+            ((block.timestamp - timeOfLastAllocation) * rewardRate * 1e18) /
+            totalStakeAmount;
+        uint256 _accumulatedReward = (_newAccumulatedRewardPerShare *
+            totalStakeAmount) /
+            1e18 -
+            totalRewardDebt;
         if (_accumulatedReward >= stakingRewardsBalance) {
-            _newAccumulatedRewardPerShare = accumulatedRewardPerShare + (stakingRewardsBalance - (accumulatedRewardPerShare * totalStakeAmount - totalRewardDebt)) * 1e18 / totalStakeAmount;
-        } 
+            _newAccumulatedRewardPerShare =
+                accumulatedRewardPerShare +
+                ((stakingRewardsBalance -
+                    (accumulatedRewardPerShare *
+                        totalStakeAmount -
+                        totalRewardDebt)) * 1e18) /
+                totalStakeAmount;
+        }
         return _newAccumulatedRewardPerShare;
     }
-
 }
