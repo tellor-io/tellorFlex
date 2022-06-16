@@ -40,7 +40,8 @@ describe("TellorFlex e2e Tests", function() {
         governance = await Governance.deploy();
         await governance.deployed();
 		const TellorFlex = await ethers.getContractFactory("TellorFlex");
-		tellor = await TellorFlex.deploy(token.address, owner.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB);
+		tellor = await TellorFlex.deploy(token.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB);
+        owner = await ethers.getSigner(await tellor.owner())
 		await tellor.deployed();
         await governance.setTellorAddress(tellor.address);
 		await token.mint(accounts[1].address, web3.utils.toWei("1000"));

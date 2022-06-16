@@ -90,14 +90,13 @@ contract TellorFlex {
      */
     constructor(
         address _token,
-        address _owner,
         uint256 _reportingLock,
         uint256 _stakeAmountDollarTarget,
         uint256 _priceTRB
     ) {
         require(_token != address(0), "must set token address");
         token = IERC20(_token);
-        owner = _owner;
+        owner = msg.sender;
         reportingLock = _reportingLock;
         stakeAmountDollarTarget = _stakeAmountDollarTarget;
         stakeAmount = (_stakeAmountDollarTarget / _priceTRB) * 10**18;
