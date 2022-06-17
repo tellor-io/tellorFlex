@@ -99,7 +99,7 @@ contract TellorFlex {
         owner = msg.sender;
         reportingLock = _reportingLock;
         stakeAmountDollarTarget = _stakeAmountDollarTarget;
-        stakeAmount = (_stakeAmountDollarTarget / _priceTRB) * 10**18;
+        stakeAmount = (_stakeAmountDollarTarget  * 10**18/ _priceTRB) * 1 ether;
     }
 
     function init(address _governanceAddress) external {
@@ -703,13 +703,13 @@ contract TellorFlex {
     // *****************************************************************************
 
     function _updateStakeAmount() internal {
-        (bool valFound, bytes memory val, uint256 timestamp) = getDataBefore(
+        (bool valFound, bytes memory val,) = getDataBefore(
             trbUsdSpotPriceQueryId,
             block.timestamp - 12 hours
         );
         if (valFound) {
-            uint256 priceTRB = abi.decode(val, (uint256));
-            stakeAmount = (stakeAmountDollarTarget / priceTRB) * 10**18;
+            uint256 _priceTRB = abi.decode(val, (uint256));
+            stakeAmount = (stakeAmountDollarTarget  * 10**18/ _priceTRB) * 1 ether;
             emit NewStakeAmount(stakeAmount);
         }
     }
