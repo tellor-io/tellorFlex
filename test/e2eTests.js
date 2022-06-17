@@ -14,9 +14,9 @@ describe("TellorFlex e2e Tests", function() {
 	let token;
 	let accounts;
     let owner;
-	const STAKE_AMOUNT_USD_TARGET = 500;
+	const STAKE_AMOUNT_USD_TARGET = web3.utils.toWei("500");
     const PRICE_TRB = web3.utils.toWei("50");
-	// const REQUIRED_STAKE = web3.utils.toWei((STAKE_AMOUNT_USD_TARGET / PRICE_TRB).toString());
+	// const REQUIRED_STAKE = web3.utils.toWei((parseInt(web3.utils.fromWei(STAKE_AMOUNT_USD_TARGET)) / parseInt(web3.utils.fromWei(PRICE_TRB))).toString());
 	const REPORTING_LOCK = 43200; // 12 hours
     const REWARD_RATE_TARGET = 60 * 60 * 24 * 30; // 30 days
     const smap = {
