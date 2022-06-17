@@ -307,7 +307,9 @@ contract TellorFlex {
     }
 
     function updateTotalTimeBasedRewardsBalance() external {
-        totalTimeBasedRewardsBalance = token.balanceOf(address(this)) - (totalStakeAmount + stakingRewardsBalance);
+        totalTimeBasedRewardsBalance =
+            token.balanceOf(address(this)) -
+            (totalStakeAmount + stakingRewardsBalance);
     }
 
     /**
@@ -703,7 +705,7 @@ contract TellorFlex {
     // *****************************************************************************
 
     function _updateStakeAmount() internal {
-        (bool valFound, bytes memory val, uint256 timestamp) = getDataBefore(
+        (bool valFound, bytes memory val, ) = getDataBefore(
             trbUsdSpotPriceQueryId,
             block.timestamp - 12 hours
         );
