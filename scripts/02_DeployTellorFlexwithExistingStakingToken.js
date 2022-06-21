@@ -8,13 +8,22 @@ require("dotenv").config();
 const web3 = require('web3');
 
 //const dotenv = require('dotenv').config()
-//npx hardhat run scripts/01_DeployTellorFlexwithExistingStakingToken.js --network rinkeby
+//npx hardhat run scripts/02_DeployTellorFlexwithExistingStakingToken.js --network rinkeby
+// npx hardhat run scripts/02_DeployTellorFlexwithExistingStakingToken.js --network harmony_mainnet
 
 var stake_amt = web3.utils.toWei("10");
 var rep_lock = 43200; // 12 hours
 // var stakerTokenAdd= '0x002e861910d7f87baa832a22ac436f25fb66fa24'
-var stakerTokenAdd= '0x9ff6799d07cbc824ec16cf5fe7bdc6798849e9cc' // harmony testnet TRB address
-var governanceAddress = '0x0Fe623d889Ad1c599E5fF3076A57D1D4F2448CDe'
+//var stakerTokenAdd= '0x9ff6799d07cbc824ec16cf5fe7bdc6798849e9cc' // harmony testnet TRB address
+//var governanceAddress = '0x0Fe623d889Ad1c599E5fF3076A57D1D4F2448CDe'
+
+//harmony mainnet      
+//var stakerTokenAdd = '0xd4b28ecb7b765c89f1e67de3359d09a3520f794e'
+//var governanceAddress = '0x0d7effefdb084dfeb1621348c8c70cc4e871eba4'
+
+//arbitrum testnet     
+var stakerTokenAdd = '0xa800d52F5E72b918f8E09D5439beBEBf09ea2f74'
+var governanceAddress = '0x0d7effefdb084dfeb1621348c8c70cc4e871eba4'
 
 
 async function deployTellorFlex(_network, _pk, _nodeURL, stakerToken, govAdd, stakeAmount, reporterLock) {
@@ -95,15 +104,22 @@ async function deployTellorFlex(_network, _pk, _nodeURL, stakerToken, govAdd, st
 }
 
 
-deployTellorFlex("harmony_testnet", process.env.TESTNET_PK, process.env.NODE_URL_HARMONY_TESTNET,stakerTokenAdd,governanceAddress,stake_amt,rep_lock)
-    .then(() => process.exit(0))
-    .catch(error => {
-        console.error(error);
-        process.exit(1);
-    });
-// deployTellorFlex("harmony_mainnet", process.env.MAINNET_PK, process.env.NODE_URL_HARMONY_MAINNET,stakerTokenAdd,governanceAddress,stake_amt,rep_lock)
+// deployTellorFlex("harmony_testnet", process.env.TESTNET_PK, process.env.NODE_URL_HARMONY_TESTNET,stakerTokenAdd,governanceAddress,stake_amt,rep_lock)
 //     .then(() => process.exit(0))
 //     .catch(error => {
 //         console.error(error);
 //         process.exit(1);
 //     });
+// deployTellorFlex("harmony_mainnet", process.env.PRIVATE_KEY, process.env.NODE_URL_HARMONY_MAINNET,stakerTokenAdd,governanceAddress,stake_amt,rep_lock)
+//     .then(() => process.exit(0))
+//     .catch(error => {
+//         console.error(error);
+//         process.exit(1);
+//     });
+
+    deployTellorFlex("arbitrum_testnet", process.env.PRIVATE_KEY, process.env.NODE_URL_ARBITRUM_TESTNET,stakerTokenAdd,governanceAddress,stake_amt,rep_lock)
+    .then(() => process.exit(0))
+    .catch(error => {
+        console.error(error);
+        process.exit(1);
+    });

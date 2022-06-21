@@ -78,6 +78,18 @@ require("dotenv").config();
       //   gas: 10000000 ,
       //   gasPrice: 50000000000
       // }
+     harmony_mainnet: {
+        url: "https://api.s0.t.hmny.io/",
+        seeds: [process.env.PRIVATE_KEY],
+        gas: 10000000 ,
+        gasPrice: 50000000000
+    }
+    , arbitrum_testnet: {
+      url: `${process.env.NODE_URL_ARBITRUM_TESTNET}`,
+      seeds: [process.env.PRIVATE_KEY],
+      gas: 10000000 ,
+      gasPrice: 50000000000
+    }
   },
   etherscan: {
     // Your API key for Etherscan
