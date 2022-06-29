@@ -32,6 +32,7 @@ contract TellorFlex {
     uint256 public totalRewardDebt;
     uint256 public stakingRewardsBalance;
     uint256 public totalTimeBasedRewardsBalance; // amount of TBR deposited into Tellor Flex
+    uint256 public totalStakers;
 
     mapping(bytes32 => Report) private reports; // mapping of query IDs to a report
     mapping(address => StakeInfo) stakerDetails; //mapping from a persons address to their staking info
@@ -56,6 +57,7 @@ contract TellorFlex {
         uint256 startVoteCount; // total number of governance votes when stake deposited
         uint256 startVoteTally; // staker vote tally when stake deposited
         mapping(bytes32 => uint256) reportsSubmittedByQueryId;
+        bool staked; // used to keep track of total stakers
     }
 
     // Events
@@ -99,7 +101,7 @@ contract TellorFlex {
         owner = msg.sender;
         reportingLock = _reportingLock;
         stakeAmountDollarTarget = _stakeAmountDollarTarget;
-        stakeAmount = _stakeAmountDollarTarget * 10**18 / _priceTRB;
+        stakeAmount = (_stakeAmountDollarTarget * 10**18) / _priceTRB;
     }
 
     function init(address _governanceAddress) external {
@@ -307,7 +309,9 @@ contract TellorFlex {
     }
 
     function updateTotalTimeBasedRewardsBalance() external {
-        totalTimeBasedRewardsBalance = token.balanceOf(address(this)) - (totalStakeAmount + stakingRewardsBalance);
+        totalTimeBasedRewardsBalance =
+            token.balanceOf(address(this)) -
+            (totalStakeAmount + stakingRewardsBalance);
     }
 
     /**
@@ -683,6 +687,14 @@ contract TellorFlex {
     }
 
     /**
+     * @dev Returns total number of current stakers. Reporters with stakedBalance less than stakeAmount are excluded from this total
+     * @return uint256 total stakers
+     */
+    function getTotalStakers() external view returns (uint256) {
+        return totalStakers;
+    }
+
+    /**
      * @dev Retrieve value from oracle based on timestamp
      * @param _queryId being requested
      * @param _timestamp to retrieve data/value from
@@ -703,13 +715,13 @@ contract TellorFlex {
     // *****************************************************************************
 
     function _updateStakeAmount() internal {
-        (bool valFound, bytes memory val,) = getDataBefore(
+        (bool valFound, bytes memory val, ) = getDataBefore(
             trbUsdSpotPriceQueryId,
             block.timestamp - 12 hours
         );
         if (valFound) {
             uint256 _priceTRB = abi.decode(val, (uint256));
-            stakeAmount = stakeAmountDollarTarget * 10**18 / _priceTRB;
+            stakeAmount = (stakeAmountDollarTarget * 10**18) / _priceTRB;
             emit NewStakeAmount(stakeAmount);
         }
     }
@@ -777,6 +789,21 @@ contract TellorFlex {
             totalStakeAmount -= _staker.stakedBalance;
         }
         _staker.stakedBalance = _newStakedBalance;
+
+        // Update total stakers
+        _updateStakeAmount();
+        if (_staker.stakedBalance >= stakeAmount) {
+            if (_staker.staked == false) {
+                totalStakers++;
+            }
+            _staker.staked = true;
+        } else {
+            if (_staker.staked == true && totalStakers > 0) {
+                totalStakers--;
+            }
+            _staker.staked = false;
+        }
+
         _staker.rewardDebt =
             (_staker.stakedBalance * accumulatedRewardPerShare) /
             1e18;
