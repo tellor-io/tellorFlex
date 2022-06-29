@@ -446,6 +446,14 @@ describe("TellorFlex Function Tests", function () {
 		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.uintTob32(4001))
 	})
 
+	it("updateTotalTimeBasedRewardsBalance", async function () {
+		expect(BN(await tellor.totalTimeBasedRewardsBalance())).to.equal(0)
+		await token.connect(accounts[1]).transfer(tellor.address, web3.utils.toWei("100"))
+		expect(BN(await tellor.totalTimeBasedRewardsBalance())).to.equal(0)
+		await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
+		expect(BN(await tellor.totalTimeBasedRewardsBalance())).to.equal(web3.utils.toWei("100"))
+	})
+
 	it("addStakingRewards", async function () {
 		await token.mint(accounts[2].address, h.toWei("1000"))
 		await h.expectThrow(tellor.connect(accounts[2]).addStakingRewards(h.toWei("1000"))) // test require: token.transferFrom...
