@@ -145,6 +145,10 @@ describe("TellorFlex Function Tests", function () {
 		expect(stakerDetails[smap.lockedBalance]).to.equal(web3.utils.toWei("10"))
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("90"))
 		expect(await tellor.totalRewardDebt()).to.equal(0)
+
+		expect(await tellor.totalStakers()).to.equal(1)
+		await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("90"))
+		expect(await tellor.totalStakers()).to.equal(0)
 	})
 
 	it("slashReporter", async function () {
@@ -266,7 +270,6 @@ describe("TellorFlex Function Tests", function () {
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
 		expect(stakerDetails[smap.stakedBalance]).to.equal(h.toWei("90"))
 		expect(stakerDetails[smap.lockedBalance]).to.equal(0)
-		expect(await tellor.getTotalStakers()).to.equal(0)
 		await h.expectThrow(tellor.connect(accounts[1]).withdrawStake()) // test require: reporter not locked for withdrawal
 	})
 
@@ -429,11 +432,19 @@ describe("TellorFlex Function Tests", function () {
 
 	it("getTotalStakers", async function () {
 		tellor = await tellor.connect(accounts[1])
+
+		// Only count unique stakers
 		expect(await tellor.getTotalStakers()).to.equal(0)
 		await tellor.depositStake(h.toWei("100"))
 		expect(await tellor.getTotalStakers()).to.equal(1)
 		await tellor.depositStake(h.toWei("100"))
-		expect(await tellor.getTotalStakers()).to.equal(1) // only count unique stakers
+		expect(await tellor.getTotalStakers()).to.equal(1)
+
+		// Unstake, restake
+		await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("200"))
+		expect(await tellor.totalStakers()).to.equal(0)
+		await tellor.depositStake(h.toWei("100"))
+		expect(await tellor.totalStakers()).to.equal(1)
 	})
 
 	it("retrieveData", async function () {
