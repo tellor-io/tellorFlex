@@ -95,6 +95,10 @@ describe("TellorFlex Function Tests", function () {
 		expect(await tellor.totalRewardDebt()).to.equal(0)
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("10"))
 
+		// Test min value for _amount argument
+		await tellor.connect(accounts[3]).depositStake(0)
+		expect(await tellor.getTotalStakers()).to.equal(1)
+
 		await tellor.connect(accounts[1]).requestStakingWithdraw(h.toWei("5"))
 		// test require(token.transferFrom... when locked balance above zero
 		await tellor.connect(accounts[1]).depositStake(h.toWei("10"))
