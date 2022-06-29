@@ -17,6 +17,7 @@ describe("TellorFlex Function Tests", function () {
 	const REQUIRED_STAKE = web3.utils.toWei((parseInt(web3.utils.fromWei(STAKE_AMOUNT_USD_TARGET)) / parseInt(web3.utils.fromWei(PRICE_TRB))).toString());
 	const REPORTING_LOCK = 43200; // 12 hours
 	const QUERYID1 = h.uintTob32(1)
+	const QUERYID2 = h.uintTob32(2)
 	const REWARD_RATE_TARGET = 60 * 60 * 24 * 30; // 30 days
 	const smap = {
 		startDate: 0,
@@ -124,6 +125,11 @@ describe("TellorFlex Function Tests", function () {
 		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(0)
 		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal("0x")
 		await h.expectThrow(tellor.connect(govSigner).removeValue(QUERYID1, blocky.timestamp)) // test require: invalid timestamp
+
+		// Test min value for _timestamp
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100), 0, '0x')
+		await expect(tellor.connect(govSigner).removeValue(QUERYID2, 0)).to.be.revertedWith("invalid timestamp")
 	})
 
 	it("requestStakingWithdraw", async function () {
