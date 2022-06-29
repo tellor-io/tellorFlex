@@ -57,6 +57,7 @@ contract TellorFlex {
         uint256 startVoteCount; // total number of governance votes when stake deposited
         uint256 startVoteTally; // staker vote tally when stake deposited
         mapping(bytes32 => uint256) reportsSubmittedByQueryId;
+        bool staked; // used to keep track of total stakers
     }
 
     // Events
@@ -154,9 +155,6 @@ contract TellorFlex {
             require(token.transferFrom(msg.sender, address(this), _amount));
         }
         _updateStakeAndPayRewards(msg.sender, _staker.stakedBalance + _amount);
-        if (_staker.startDate == 0) {
-            totalStakers++;
-        }
         _staker.startDate = block.timestamp; // This resets the staker start date to now
 
         emit NewStaker(msg.sender, _amount);
@@ -237,9 +235,6 @@ contract TellorFlex {
             _slashAmount = _staker.stakedBalance + _staker.lockedBalance;
             _updateStakeAndPayRewards(_reporter, 0);
             _staker.lockedBalance = 0;
-        }
-        if (_staker.stakedBalance < stakeAmount && totalStakers > 0) {
-            totalStakers--;
         }
         token.transfer(_recipient, _slashAmount);
         emit ReporterSlashed(_reporter, _recipient, _slashAmount);
@@ -327,10 +322,6 @@ contract TellorFlex {
         // Ensure reporter is locked and that enough time has passed
         require(block.timestamp - _s.startDate >= 7 days, "7 days didn't pass");
         require(_s.lockedBalance > 0, "reporter not locked for withdrawal");
-        _updateStakeAmount();
-        if (_s.stakedBalance >= stakeAmount && totalStakers > 0) {
-            totalStakers--;
-        }
         token.transfer(msg.sender, _s.lockedBalance);
         _s.lockedBalance = 0;
         emit StakeWithdrawn(msg.sender);
@@ -798,6 +789,21 @@ contract TellorFlex {
             totalStakeAmount -= _staker.stakedBalance;
         }
         _staker.stakedBalance = _newStakedBalance;
+
+        // Update total stakers
+        _updateStakeAmount();
+        if (_staker.stakedBalance >= stakeAmount) {
+            if (_staker.staked == false) {
+                totalStakers++;
+            }
+            _staker.staked = true;
+        } else {
+            if (_staker.staked == true && totalStakers > 0) {
+                totalStakers--;
+            }
+            _staker.staked = false;
+        }
+
         _staker.rewardDebt =
             (_staker.stakedBalance * accumulatedRewardPerShare) /
             1e18;
