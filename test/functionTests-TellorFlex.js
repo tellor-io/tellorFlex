@@ -468,9 +468,18 @@ describe("TellorFlex Function Tests", function () {
 	it("addStakingRewards", async function () {
 		await token.mint(accounts[2].address, h.toWei("1000"))
 		await h.expectThrow(tellor.connect(accounts[2]).addStakingRewards(h.toWei("1000"))) // test require: token.transferFrom...
+
 		await token.connect(accounts[2]).approve(tellor.address, h.toWei("1000"))
 		expect(await token.balanceOf(accounts[2].address)).to.equal(h.toWei("1000"))
 		await tellor.connect(accounts[2]).addStakingRewards(h.toWei("1000"))
+		expect(await tellor.stakingRewardsBalance()).to.equal(h.toWei("1000"))
+		expect(await token.balanceOf(accounts[2].address)).to.equal(0)
+		expect(await token.balanceOf(tellor.address)).to.equal(h.toWei("1000"))
+		expectedRewardRate = Math.floor(h.toWei("1000") / REWARD_RATE_TARGET)
+		expect(await tellor.rewardRate()).to.equal(expectedRewardRate)
+
+		// Test min value
+		await tellor.connect(accounts[2]).addStakingRewards(0)
 		expect(await tellor.stakingRewardsBalance()).to.equal(h.toWei("1000"))
 		expect(await token.balanceOf(accounts[2].address)).to.equal(0)
 		expect(await token.balanceOf(tellor.address)).to.equal(h.toWei("1000"))
