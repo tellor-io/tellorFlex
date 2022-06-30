@@ -16,9 +16,13 @@ describe("TellorFlex e2e Tests", function() {
     let owner;
 	const STAKE_AMOUNT_USD_TARGET = web3.utils.toWei("500");
     const PRICE_TRB = web3.utils.toWei("50");
-	// const REQUIRED_STAKE = web3.utils.toWei((parseInt(web3.utils.fromWei(STAKE_AMOUNT_USD_TARGET)) / parseInt(web3.utils.fromWei(PRICE_TRB))).toString());
+	const REQUIRED_STAKE = web3.utils.toWei((parseInt(web3.utils.fromWei(STAKE_AMOUNT_USD_TARGET)) / parseInt(web3.utils.fromWei(PRICE_TRB))).toString());
 	const REPORTING_LOCK = 43200; // 12 hours
     const REWARD_RATE_TARGET = 60 * 60 * 24 * 30; // 30 days
+    const abiCoder = new ethers.utils.AbiCoder
+	const TRB_QUERY_DATA_ARGS = abiCoder.encode(["string", "string"], ["trb", "usd"])
+	const TRB_QUERY_DATA = abiCoder.encode(["string", "bytes"], ["SpotPrice", TRB_QUERY_DATA_ARGS])
+	const TRB_QUERY_ID = ethers.utils.keccak256(TRB_QUERY_DATA)
     const smap = {
 		startDate: 0,
 		stakedBalance: 1,
@@ -315,5 +319,45 @@ describe("TellorFlex e2e Tests", function() {
         //stakingRewardsBalance should still be 150
 
         //call claim staking rewards
+    })
+
+    it.only("Test bad TRB price encoding, 12 hours old", async function() {
+        // Setup
+		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
+		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
+		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("1000"))
+		
+		// Test no reported TRB price
+		await tellor.updateStakeAmount()
+		expect(await tellor.stakeAmount()).to.equal(REQUIRED_STAKE)
+
+		// Test updating when multiple prices have been reported
+		h.advanceTime(60 * 60 * 1)
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(PRICE_TRB * 1.5), 0, TRB_QUERY_DATA)
+		h.advanceTime(60 * 60 * 1)
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(PRICE_TRB * 2), 0, TRB_QUERY_DATA)
+		h.advanceTime(60 * 60 * 1)
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(PRICE_TRB * 3), 0, TRB_QUERY_DATA)
+		h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).updateStakeAmount()
+		expect(await tellor.getStakeAmount()).to.equal(BigInt(REQUIRED_STAKE) / BigInt(3))
+
+		// Test bad TRB price encoding
+		badPrice = abiCoder.encode(["string"], ["Where's the beef?"])
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, badPrice, 0, TRB_QUERY_DATA)
+		await h.advanceTime(86400/2)
+		await h.expectThrow(tellor.updateStakeAmount())
+		expect(await tellor.stakeAmount()).to.equal(BigInt(REQUIRED_STAKE) / BigInt(3))
+
+		// Test updating when multiple prices have been reported
+		h.advanceTime(60 * 60 * 1)
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(PRICE_TRB * 7), 0, TRB_QUERY_DATA)
+		h.advanceTime(60 * 60 * 1)
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(PRICE_TRB * 8), 0, TRB_QUERY_DATA)
+		h.advanceTime(60 * 60 * 1)
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(PRICE_TRB * 9), 0, TRB_QUERY_DATA)
+		h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).updateStakeAmount()
+		expect(await tellor.getStakeAmount()).to.equal(BigInt(REQUIRED_STAKE) / BigInt(9))
     })
 })
