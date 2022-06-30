@@ -499,6 +499,10 @@ describe("TellorFlex Function Tests", function () {
 		await tellor.submitValue(QUERYID1, h.uintTob32(4001), 0, '0x')
 		blocky = await h.getBlock()
 		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.uintTob32(4001))
+
+		// Test max/min values for _timestamp arg
+		expect(await tellor.retrieveData(QUERYID1, 0)).to.equal(ethers.utils.hexlify("0x"))
+		expect(await tellor.retrieveData(QUERYID1, ethers.constants.MaxUint256)).to.equal(ethers.utils.hexlify("0x"))
 	})
 
 	it("updateTotalTimeBasedRewardsBalance", async function () {
