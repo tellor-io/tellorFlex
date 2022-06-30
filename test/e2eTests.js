@@ -367,17 +367,25 @@ describe("TellorFlex e2e Tests", function () {
         await token.mint(accounts[1].address, web3.utils.toWei("1000"));
         await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
 
-        // Add to time-based rewards total
-        await token.mint(tellor.address, web3.utils.toWei("100"))
-        // Add to stakes total
+        // Check balance after adding time-based rewards, stake, & staking rewards
+        await token.mint(tellor.address, web3.utils.toWei("100")) // add tb rewards
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("100"))
-        // Add to staking rewards total
         await tellor.connect(accounts[1]).addStakingRewards(web3.utils.toWei("100"))
-        // Check oracle balance
-        expect(await token.balanceOf(tellor.address)).to.equal(web3.utils.toWei("300"))
+        tellorBalance1 = await token.balanceOf(tellor.address)
+        expect(tellorBalance1).to.equal(web3.utils.toWei("300"))
+
+        // Reduce time-based rewards & check updated balance
+        await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
+        await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(420), 0, TRB_QUERY_DATA)
+        rewardsGiven = web3.utils.toWei("100") - await tellor.totalTimeBasedRewardsBalance()
+        tellorBalance2 = await token.balanceOf(tellor.address)
+        expect(tellorBalance2).to.equal(BigInt(tellorBalance1) - BigInt(rewardsGiven))
+
+        // Reduce stakes & check balance
+
     })
 
-    it.only("TBR, stakes, and staking rewards can't borrow from each other", async function () {
+    it("TBR, stakes, and staking rewards can't borrow from each other", async function () {
         console.log("sup")
     })
 })
