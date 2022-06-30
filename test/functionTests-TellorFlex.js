@@ -581,7 +581,7 @@ describe("TellorFlex Function Tests", function () {
 		expect(index[1]).to.equal(1)
 	})
 
-	it.only("getDataBefore()", async function () {
+	it("getDataBefore()", async function () {
 		// Setup
 		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
 		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
