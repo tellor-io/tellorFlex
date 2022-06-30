@@ -19,6 +19,10 @@ describe("TellorFlex Function Tests", function () {
 	const QUERYID1 = h.uintTob32(1)
 	const QUERYID2 = h.uintTob32(2)
 	const REWARD_RATE_TARGET = 60 * 60 * 24 * 30; // 30 days
+	const abiCoder = new ethers.utils.AbiCoder
+	const TRB_QUERY_DATA_ARGS = abiCoder.encode(["string", "string"], ["trb", "usd"])
+	const TRB_QUERY_DATA = abiCoder.encode(["string", "bytes"], ["SpotPrice", TRB_QUERY_DATA_ARGS])
+	const TRB_QUERY_ID = ethers.utils.keccak256(TRB_QUERY_DATA)
 	const smap = {
 		startDate: 0,
 		stakedBalance: 1,
@@ -29,6 +33,7 @@ describe("TellorFlex Function Tests", function () {
 		startVoteCount: 6,
 		startVoteTally: 7
 	} // getStakerInfo() indices
+	
 
 
 	beforeEach(async function () {
@@ -602,7 +607,7 @@ describe("TellorFlex Function Tests", function () {
 		expect(index[1]).to.equal(1)
 	})
 
-	it.only("getDataBefore()", async function () {
+	it("getDataBefore()", async function () {
 		// Setup
 		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
 		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
@@ -661,5 +666,23 @@ describe("TellorFlex Function Tests", function () {
 		expect(dataBefore[0])
 		expect(dataBefore[1]).to.equal(h.bytes(150))
 		expect(dataBefore[2]).to.equal(blocky1.timestamp)
+	})
+
+	it.only("updateStakeAmount()", async function () {
+		// Setup
+		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
+		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
+		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("1000"))
+		
+
+		// await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(150), 0, '0x')
+		// blocky1 = await h.getBlock()
+
+		await tellor.updateStakeAmount()
+		expect(await tellor.stakeAmount()).to.equal(BigInt(STAKE_AMOUNT_USD_TARGET) / BigInt(PRICE_TRB) * BigInt(h.toWei("1")))
+
+		let newTrbPrice1 = h.uintTob32(h.toWei("100"))
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, newTrbPrice1, 0, TRB_QUERY_DATA)
+
 	})
 });
