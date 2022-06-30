@@ -562,4 +562,49 @@ describe("TellorFlex Function Tests", function () {
 		expect(pendingReward).to.equal(expectedPendingReward)
 		expect(await tellor.getPendingRewardByStaker(accounts[2].address)).to.equal(0)
 	})
+
+	it("getIndexForDataBefore()", async function () {
+		// Setup
+		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
+		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
+		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("1000"))
+
+		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100), 0, '0x')
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100), 1, '0x')
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100), 2, '0x')
+
+		blocky3 = await h.getBlock()
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky3.timestamp)
+		expect(index[0])
+		expect(index[1]).to.equal(1)
+	})
+
+	it("getDataBefore()", async function () {
+		// Setup
+		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
+		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
+		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("1000"))
+
+		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(150), 0, '0x')
+		blocky1 = await h.getBlock()
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(160), 1, '0x')
+		blocky2 = await h.getBlock()
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(170), 2, '0x')
+		blocky3 = await h.getBlock()
+
+		dataBefore = await tellor.getDataBefore(QUERYID2, blocky3.timestamp + 1)
+		expect(dataBefore[0])
+		expect(dataBefore[1]).to.equal(h.bytes(170))
+		expect(dataBefore[2]).to.equal(blocky3.timestamp)
+
+		dataBefore = await tellor.getDataBefore(QUERYID2, blocky2.timestamp)
+		console.log(dataBefore)
+		expect(dataBefore[0])
+		expect(dataBefore[1]).to.equal(h.bytes(150))
+		expect(dataBefore[2]).to.equal(blocky1.timestamp)
+	})
 });
