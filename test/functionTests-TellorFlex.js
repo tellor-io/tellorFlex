@@ -17,6 +17,7 @@ describe("TellorFlex Function Tests", function () {
 	const REQUIRED_STAKE = web3.utils.toWei((parseInt(web3.utils.fromWei(STAKE_AMOUNT_USD_TARGET)) / parseInt(web3.utils.fromWei(PRICE_TRB))).toString());
 	const REPORTING_LOCK = 43200; // 12 hours
 	const QUERYID1 = h.uintTob32(1)
+	const QUERYID2 = h.uintTob32(2)
 	const REWARD_RATE_TARGET = 60 * 60 * 24 * 30; // 30 days
 	const smap = {
 		startDate: 0,
@@ -95,6 +96,10 @@ describe("TellorFlex Function Tests", function () {
 		expect(await tellor.totalRewardDebt()).to.equal(0)
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("10"))
 
+		// Test min value for _amount argument
+		await tellor.connect(accounts[3]).depositStake(0)
+		expect(await tellor.getTotalStakers()).to.equal(1)
+
 		await tellor.connect(accounts[1]).requestStakingWithdraw(h.toWei("5"))
 		// test require(token.transferFrom... when locked balance above zero
 		await tellor.connect(accounts[1]).depositStake(h.toWei("10"))
@@ -120,6 +125,12 @@ describe("TellorFlex Function Tests", function () {
 		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(0)
 		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal("0x")
 		await h.expectThrow(tellor.connect(govSigner).removeValue(QUERYID1, blocky.timestamp)) // test require: invalid timestamp
+
+		// Test min/max values for _timestamp argument
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100), 0, '0x')
+		await expect(tellor.connect(govSigner).removeValue(QUERYID2, 0)).to.be.revertedWith("invalid timestamp")
+		await expect(tellor.connect(govSigner).removeValue(QUERYID2, ethers.constants.MaxUint256)).to.be.revertedWith("invalid timestamp")
 	})
 
 	it("requestStakingWithdraw", async function () {
@@ -137,6 +148,18 @@ describe("TellorFlex Function Tests", function () {
 		await h.expectThrow(tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("101"))) // test require: insufficient staked balance
 
 		await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("10"))
+		blocky = await h.getBlock()
+		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
+		expect(stakerDetails[smap.startDate]).to.equal(blocky.timestamp)
+		expect(stakerDetails[smap.rewardDebt]).to.equal(0)
+		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("90"))
+		expect(stakerDetails[smap.lockedBalance]).to.equal(web3.utils.toWei("10"))
+		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("90"))
+		expect(await tellor.totalRewardDebt()).to.equal(0)
+
+		// Test max/min for _amount arg
+		await expect(tellor.connect(accounts[1]).requestStakingWithdraw(ethers.constants.MaxUint256)).to.be.revertedWith("insufficient staked balance")
+		await tellor.connect(accounts[1]).requestStakingWithdraw(0)
 		blocky = await h.getBlock()
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
 		expect(stakerDetails[smap.startDate]).to.equal(blocky.timestamp)
@@ -249,6 +272,27 @@ describe("TellorFlex Function Tests", function () {
 		expect(await tellor.timeOfLastNewValue()).to.equal(blocky.timestamp)
 		expect(await tellor.getReportsSubmittedByAddress(accounts[1].address)).to.equal(2)
 		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, QUERYID1)).to.equal(2)
+
+		// Test submit multiple identical values w/ min _nonce
+		await token.mint(accounts[2].address, h.toWei("120"))
+		await token.connect(accounts[2]).approve(tellor.address, h.toWei("120"))
+		await tellor.connect(accounts[2]).depositStake(web3.utils.toWei("120"))
+		await tellor.connect(accounts[2]).submitValue(QUERYID1, h.uintTob32(4001), 0, '0x')
+		await h.advanceTime(3600)
+		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4001), 0, '0x')
+		blocky = await h.getBlock()
+		expect(await tellor.getTimestampIndexByTimestamp(QUERYID1, blocky.timestamp)).to.equal(3)
+		expect(await tellor.getTimestampbyQueryIdandIndex(QUERYID1, 3)).to.equal(blocky.timestamp)
+		expect(await tellor.getBlockNumberByTimestamp(QUERYID1, blocky.timestamp)).to.equal(blocky.number)
+		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.uintTob32(4001))
+		expect(await tellor.getReporterByTimestamp(QUERYID1, blocky.timestamp)).to.equal(accounts[1].address)
+		expect(await tellor.timeOfLastNewValue()).to.equal(blocky.timestamp)
+		expect(await tellor.getReportsSubmittedByAddress(accounts[1].address)).to.equal(3)
+		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, QUERYID1)).to.equal(3)
+
+		// Test max val for _nonce
+		await h.advanceTime(3600)
+		await expect(tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4001), ethers.constants.MaxUint256, '0x')).to.be.revertedWith("nonce must match timestamp index")
 	})
 
 	it("withdrawStake", async function () {
@@ -455,14 +499,35 @@ describe("TellorFlex Function Tests", function () {
 		await tellor.submitValue(QUERYID1, h.uintTob32(4001), 0, '0x')
 		blocky = await h.getBlock()
 		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.uintTob32(4001))
+
+		// Test max/min values for _timestamp arg
+		expect(await tellor.retrieveData(QUERYID1, 0)).to.equal(ethers.utils.hexlify("0x"))
+		expect(await tellor.retrieveData(QUERYID1, ethers.constants.MaxUint256)).to.equal(ethers.utils.hexlify("0x"))
+	})
+
+	it("updateTotalTimeBasedRewardsBalance", async function () {
+		expect(BN(await tellor.totalTimeBasedRewardsBalance())).to.equal(0)
+		await token.connect(accounts[1]).transfer(tellor.address, web3.utils.toWei("100"))
+		expect(BN(await tellor.totalTimeBasedRewardsBalance())).to.equal(0)
+		await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
+		expect(BN(await tellor.totalTimeBasedRewardsBalance())).to.equal(web3.utils.toWei("100"))
 	})
 
 	it("addStakingRewards", async function () {
 		await token.mint(accounts[2].address, h.toWei("1000"))
 		await h.expectThrow(tellor.connect(accounts[2]).addStakingRewards(h.toWei("1000"))) // test require: token.transferFrom...
+
 		await token.connect(accounts[2]).approve(tellor.address, h.toWei("1000"))
 		expect(await token.balanceOf(accounts[2].address)).to.equal(h.toWei("1000"))
 		await tellor.connect(accounts[2]).addStakingRewards(h.toWei("1000"))
+		expect(await tellor.stakingRewardsBalance()).to.equal(h.toWei("1000"))
+		expect(await token.balanceOf(accounts[2].address)).to.equal(0)
+		expect(await token.balanceOf(tellor.address)).to.equal(h.toWei("1000"))
+		expectedRewardRate = Math.floor(h.toWei("1000") / REWARD_RATE_TARGET)
+		expect(await tellor.rewardRate()).to.equal(expectedRewardRate)
+
+		// Test min value
+		await tellor.connect(accounts[2]).addStakingRewards(0)
 		expect(await tellor.stakingRewardsBalance()).to.equal(h.toWei("1000"))
 		expect(await token.balanceOf(accounts[2].address)).to.equal(0)
 		expect(await token.balanceOf(tellor.address)).to.equal(h.toWei("1000"))
