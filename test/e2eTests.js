@@ -321,7 +321,7 @@ describe("TellorFlex e2e Tests", function() {
         //call claim staking rewards
     })
 
-    it.only("Test bad TRB price encoding, 12 hours old", async function() {
+    it("Test bad TRB price encoding, 12 hours old", async function() {
         // Setup
 		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
 		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
