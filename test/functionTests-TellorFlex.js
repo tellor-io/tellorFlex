@@ -577,11 +577,32 @@ describe("TellorFlex Function Tests", function () {
 
 		blocky3 = await h.getBlock()
 		index = await tellor.getIndexForDataBefore(QUERYID2, blocky3.timestamp)
-		expect(index[0])
+		expect(index[0]).to.be.true
+		expect(index[1]).to.equal(1)
+
+		// advance time one year and test
+		await h.advanceTime(86400 * 365)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky3.timestamp)
+		expect(index[0]).to.be.true
+		expect(index[1]).to.equal(1)
+
+		// advance time one year and test
+		await h.advanceTime(86400 * 365)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky3.timestamp)
+		expect(index[0]).to.be.true
+		expect(index[1]).to.equal(1)
+
+		for(i = 0; i < 100; i++) {
+			await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100 + i), 0, '0x')
+			await h.advanceTime(60 * 60 * 12)
+		}
+
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky3.timestamp)
+		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
 	})
 
-	it("getDataBefore()", async function () {
+	it.only("getDataBefore()", async function () {
 		// Setup
 		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
 		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
@@ -602,7 +623,41 @@ describe("TellorFlex Function Tests", function () {
 		expect(dataBefore[2]).to.equal(blocky3.timestamp)
 
 		dataBefore = await tellor.getDataBefore(QUERYID2, blocky2.timestamp)
-		console.log(dataBefore)
+		expect(dataBefore[0])
+		expect(dataBefore[1]).to.equal(h.bytes(150))
+		expect(dataBefore[2]).to.equal(blocky1.timestamp)
+
+		// advance time one year and test
+		await h.advanceTime(86400 * 365)
+		dataBefore = await tellor.getDataBefore(QUERYID2, blocky3.timestamp + 1)
+		expect(dataBefore[0])
+		expect(dataBefore[1]).to.equal(h.bytes(170))
+		expect(dataBefore[2]).to.equal(blocky3.timestamp)
+
+		// advance time one year and test
+		await h.advanceTime(86400 * 365)
+		dataBefore = await tellor.getDataBefore(QUERYID2, blocky3.timestamp + 1)
+		expect(dataBefore[0])
+		expect(dataBefore[1]).to.equal(h.bytes(170))
+		expect(dataBefore[2]).to.equal(blocky3.timestamp)
+
+		dataBefore = await tellor.getDataBefore(QUERYID2, blocky2.timestamp)
+		expect(dataBefore[0])
+		expect(dataBefore[1]).to.equal(h.bytes(150))
+		expect(dataBefore[2]).to.equal(blocky1.timestamp)
+
+		// submit 100 values and test
+		for(i = 0; i < 100; i++) {
+			await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100 + i), 0, '0x')
+			await h.advanceTime(60 * 60 * 12)
+		}
+
+		dataBefore = await tellor.getDataBefore(QUERYID2, blocky3.timestamp + 1)
+		expect(dataBefore[0])
+		expect(dataBefore[1]).to.equal(h.bytes(170))
+		expect(dataBefore[2]).to.equal(blocky3.timestamp)
+
+		dataBefore = await tellor.getDataBefore(QUERYID2, blocky2.timestamp)
 		expect(dataBefore[0])
 		expect(dataBefore[1]).to.equal(h.bytes(150))
 		expect(dataBefore[2]).to.equal(blocky1.timestamp)
