@@ -40,7 +40,7 @@ describe("TellorFlex Function Tests", function () {
 		const Governance = await ethers.getContractFactory("GovernanceMock");
 		governance = await Governance.deploy();
 		await governance.deployed();
-		const TellorFlex = await ethers.getContractFactory("TellorFlex");
+		const TellorFlex = await ethers.getContractFactory("TestFlex");
 		tellor = await TellorFlex.deploy(token.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB);
 		owner = await ethers.getSigner(await tellor.owner())
 		await tellor.deployed();
