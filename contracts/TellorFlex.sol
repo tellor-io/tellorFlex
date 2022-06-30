@@ -104,6 +104,7 @@ contract TellorFlex {
         stakeAmount = (_stakeAmountDollarTarget * 10**18) / _priceTRB;
     }
 
+
     function init(address _governanceAddress) external {
         require(msg.sender == owner);
         require(governance == address(0));
@@ -111,7 +112,6 @@ contract TellorFlex {
             _governanceAddress != address(0),
             "governance address can't be zero address"
         );
-
         governance = _governanceAddress;
     }
 
@@ -218,7 +218,6 @@ contract TellorFlex {
             "zero staker balance"
         );
         uint256 _slashAmount;
-        _updateStakeAmount();
         if (_staker.lockedBalance >= stakeAmount) {
             _slashAmount = stakeAmount;
             _staker.lockedBalance -= stakeAmount;
@@ -260,7 +259,6 @@ contract TellorFlex {
             "nonce must match timestamp index"
         );
         StakeInfo storage _staker = stakerDetails[msg.sender];
-        _updateStakeAmount();
         require(
             _staker.stakedBalance >= stakeAmount,
             "balance must be greater than stake amount"
@@ -306,6 +304,19 @@ contract TellorFlex {
             _queryData,
             msg.sender
         );
+    }
+
+    function updateStakeAmount() external {
+        (bool _valFound, bytes memory _val, ) = getDataBefore(
+            trbUsdSpotPriceQueryId,
+            block.timestamp - 12 hours
+        );
+        if (_valFound) {
+            uint256 _priceTRB = abi.decode(_val, (uint256));
+            require(_priceTRB >= 0.01 ether && _priceTRB < 1000000 ether, "invalid trb price");
+            stakeAmount = (stakeAmountDollarTarget * 10**18) / _priceTRB;
+            emit NewStakeAmount(stakeAmount);
+        }
     }
 
     function updateTotalTimeBasedRewardsBalance() external {
@@ -714,18 +725,6 @@ contract TellorFlex {
     // *                                                                           *
     // *****************************************************************************
 
-    function _updateStakeAmount() internal {
-        (bool valFound, bytes memory val, ) = getDataBefore(
-            trbUsdSpotPriceQueryId,
-            block.timestamp - 12 hours
-        );
-        if (valFound) {
-            uint256 _priceTRB = abi.decode(val, (uint256));
-            stakeAmount = (stakeAmountDollarTarget * 10**18) / _priceTRB;
-            emit NewStakeAmount(stakeAmount);
-        }
-    }
-
     function _updateRewards() internal {
         if (timeOfLastAllocation == block.timestamp) {
             return;
@@ -791,7 +790,6 @@ contract TellorFlex {
         _staker.stakedBalance = _newStakedBalance;
 
         // Update total stakers
-        _updateStakeAmount();
         if (_staker.stakedBalance >= stakeAmount) {
             if (_staker.staked == false) {
                 totalStakers++;

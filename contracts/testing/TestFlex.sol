@@ -11,10 +11,6 @@ contract TestFlex is TellorFlex {
         uint256 _priceTRB
     ) TellorFlex(_token, _reportingLock, _stakeAmountDollarTarget, _priceTRB) {}
 
-    function updateStakeAmount() external {
-        _updateStakeAmount();
-    }
-
     function updateRewards() external {
         _updateRewards();
     }
