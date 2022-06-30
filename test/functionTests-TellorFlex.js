@@ -272,6 +272,27 @@ describe("TellorFlex Function Tests", function () {
 		expect(await tellor.timeOfLastNewValue()).to.equal(blocky.timestamp)
 		expect(await tellor.getReportsSubmittedByAddress(accounts[1].address)).to.equal(2)
 		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, QUERYID1)).to.equal(2)
+
+		// Test submit multiple identical values w/ min _nonce
+		await token.mint(accounts[2].address, h.toWei("120"))
+		await token.connect(accounts[2]).approve(tellor.address, h.toWei("120"))
+		await tellor.connect(accounts[2]).depositStake(web3.utils.toWei("120"))
+		await tellor.connect(accounts[2]).submitValue(QUERYID1, h.uintTob32(4001), 0, '0x')
+		await h.advanceTime(3600)
+		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4001), 0, '0x')
+		blocky = await h.getBlock()
+		expect(await tellor.getTimestampIndexByTimestamp(QUERYID1, blocky.timestamp)).to.equal(3)
+		expect(await tellor.getTimestampbyQueryIdandIndex(QUERYID1, 3)).to.equal(blocky.timestamp)
+		expect(await tellor.getBlockNumberByTimestamp(QUERYID1, blocky.timestamp)).to.equal(blocky.number)
+		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.uintTob32(4001))
+		expect(await tellor.getReporterByTimestamp(QUERYID1, blocky.timestamp)).to.equal(accounts[1].address)
+		expect(await tellor.timeOfLastNewValue()).to.equal(blocky.timestamp)
+		expect(await tellor.getReportsSubmittedByAddress(accounts[1].address)).to.equal(3)
+		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, QUERYID1)).to.equal(3)
+
+		// Test max val for _nonce
+		await h.advanceTime(3600)
+		await expect(tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4001), ethers.constants.MaxUint256, '0x')).to.be.revertedWith("nonce must match timestamp index")
 	})
 
 	it("withdrawStake", async function () {
