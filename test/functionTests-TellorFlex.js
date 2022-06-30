@@ -29,6 +29,12 @@ describe("TellorFlex Function Tests", function () {
 		startVoteCount: 6,
 		startVoteTally: 7
 	} // getStakerInfo() indices
+	let abi = new ethers.utils.AbiCoder
+	const TRB_USD_SPOTPRICE_QUERYDATA = abi.encode(
+		['string', 'bytes'],
+		['SpotPrice', abi.encode(['string', 'string'], ['trb', 'usd'])],
+	)
+	const TRB_USD_SPOTPRICE_QUERYID = ethers.utils.keccak256(TRB_USD_SPOTPRICE_QUERYDATA)
 
 
 	beforeEach(async function () {
@@ -461,6 +467,34 @@ describe("TellorFlex Function Tests", function () {
 		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
 		blocky = await h.getBlock()
 		expect(await tellor.getTimestampIndexByTimestamp(QUERYID1, blocky.timestamp)).to.equal(1)
+	})
+
+	it("_updateStakeAmount", async function () {
+		// Setup
+		await token.mint(accounts[1].address, h.toWei("1000"))
+		await token.connect(accounts[1]).approve(tellor.address, h.toWei("1000"))
+		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("1000"))
+
+		// Test updating when 12 hrs have NOT passed
+		await tellor.connect(accounts[1]).submitValue(TRB_USD_SPOTPRICE_QUERYID, h.uintTob32(PRICE_TRB * 2), 0, TRB_USD_SPOTPRICE_QUERYDATA)
+		await tellor.connect(accounts[1]).updateStakeAmount()
+		expect(await tellor.getStakeAmount()).to.equal(REQUIRED_STAKE)
+
+		// Test updating when 12 hrs have passed
+		h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).updateStakeAmount()
+		expect(await tellor.getStakeAmount()).to.equal(BigInt(REQUIRED_STAKE) / BigInt(2))
+
+		// Test updating when multiple prices have been reported
+		h.advanceTime(60 * 60 * 1)
+		await tellor.connect(accounts[1]).submitValue(TRB_USD_SPOTPRICE_QUERYID, h.uintTob32(PRICE_TRB * 1.5), 0, TRB_USD_SPOTPRICE_QUERYDATA)
+		h.advanceTime(60 * 60 * 1)
+		await tellor.connect(accounts[1]).submitValue(TRB_USD_SPOTPRICE_QUERYID, h.uintTob32(PRICE_TRB * 2), 0, TRB_USD_SPOTPRICE_QUERYDATA)
+		h.advanceTime(60 * 60 * 1)
+		await tellor.connect(accounts[1]).submitValue(TRB_USD_SPOTPRICE_QUERYID, h.uintTob32(PRICE_TRB * 3), 0, TRB_USD_SPOTPRICE_QUERYDATA)
+		h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).updateStakeAmount()
+		expect(await tellor.getStakeAmount()).to.equal(BigInt(REQUIRED_STAKE) / BigInt(3))
 	})
 
 	it("getTotalStakeAmount", async function () {
