@@ -461,10 +461,9 @@ describe("TellorFlex e2e Tests", function () {
         await tellor.connect(accounts[1]).withdrawStake()
         await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
         stakingRewards2 = await tellor.stakingRewardsBalance()
-        stakingRewardsLoss = stakingRewards1 - stakingRewards2
+        stakingRewardsLoss = BigInt(stakingRewards1) - BigInt(stakingRewards2)
         expect(await tellor.totalStakeAmount()).to.equal(0)
         expect(await tellor.totalTimeBasedRewardsBalance()).to.equal(web3.utils.toWei("100"))
-        // I think this last one breaks bc of a precision error from the dumb BigInts
-        // expect(await tellor.stakingRewardsBalance()).to.equal(BigInt(web3.utils.toWei("100")) - BigInt(stakingRewardsLoss))
+        expect(await tellor.stakingRewardsBalance()).to.equal(BigInt(web3.utils.toWei("100")) - BigInt(stakingRewardsLoss))
     })
 })
