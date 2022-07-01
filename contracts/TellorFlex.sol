@@ -134,6 +134,7 @@ contract TellorFlex {
         StakeInfo storage _staker = stakerDetails[msg.sender];
         if (_staker.lockedBalance > 0) {
             if (_staker.lockedBalance >= _amount) {
+                // if staker's locked balance covers full _amount, use that
                 _staker.lockedBalance -= _amount;
             } else {
                 require(
@@ -732,14 +733,18 @@ contract TellorFlex {
     // *                                                                           *
     // *****************************************************************************
 
+    /**
+     * @dev Updates accumulated staking rewards per staked token
+     */
     function _updateRewards() internal {
         if (timeOfLastAllocation == block.timestamp) {
             return;
         }
-        if (totalStakeAmount == 0) {
+        if (totalStakeAmount == 0 || rewardRate == 0) {
             timeOfLastAllocation = block.timestamp;
             return;
         }
+        // calculate accumulated reward per token staked
         uint256 _newAccumulatedRewardPerShare = accumulatedRewardPerShare +
             ((block.timestamp - timeOfLastAllocation) * rewardRate * 1e18) /
             totalStakeAmount;
@@ -747,13 +752,11 @@ contract TellorFlex {
             totalStakeAmount) /
             1e18 -
             totalRewardDebt;
+        // if staking rewards run out, calculate remaining reward per staked
+        // token and set rewardRate to 0
         if (_accumulatedReward >= stakingRewardsBalance) {
-            accumulatedRewardPerShare +=
-                ((stakingRewardsBalance -
-                    ((accumulatedRewardPerShare * totalStakeAmount) /
-                        1e18 -
-                        totalRewardDebt)) * 1e18) /
-                totalStakeAmount;
+            uint256 _newPendingRewards = stakingRewardsBalance - ((accumulatedRewardPerShare * totalStakeAmount) / 1e18 - totalRewardDebt);
+            accumulatedRewardPerShare += (_newPendingRewards * 1e18) / totalStakeAmount;
             rewardRate = 0;
         } else {
             accumulatedRewardPerShare = _newAccumulatedRewardPerShare;
@@ -761,6 +764,11 @@ contract TellorFlex {
         timeOfLastAllocation = block.timestamp;
     }
 
+    /**
+     * @dev Called whenever a user's stake amount changes. First updates staking rewards,
+     * transfers pending rewards to user's address, and finally updates user's stake amount
+     * and other relevant variables.
+     */
     function _updateStakeAndPayRewards(
         address _stakerAddress,
         uint256 _newStakedBalance
@@ -809,6 +817,7 @@ contract TellorFlex {
             _staker.staked = false;
         }
 
+        // tracks rewards accumulated before stake amount updated
         _staker.rewardDebt =
             (_staker.stakedBalance * accumulatedRewardPerShare) /
             1e18;
@@ -816,6 +825,10 @@ contract TellorFlex {
         totalStakeAmount += _staker.stakedBalance;
     }
 
+    /**
+     * @dev Internal function retrieves updated accumulatedRewardPerShare
+     * @return uint256 up-to-date accumulated reward per share
+     */
     function _getUpdatedAccumulatedRewardPerShare()
         internal
         view
@@ -832,13 +845,8 @@ contract TellorFlex {
             1e18 -
             totalRewardDebt;
         if (_accumulatedReward >= stakingRewardsBalance) {
-            _newAccumulatedRewardPerShare =
-                accumulatedRewardPerShare +
-                ((stakingRewardsBalance -
-                    (accumulatedRewardPerShare *
-                        totalStakeAmount -
-                        totalRewardDebt)) * 1e18) /
-                totalStakeAmount;
+            uint256 _newPendingRewards = stakingRewardsBalance - ((accumulatedRewardPerShare * totalStakeAmount) / 1e18 - totalRewardDebt);
+            _newAccumulatedRewardPerShare = accumulatedRewardPerShare + (_newPendingRewards * 1e18) / totalStakeAmount;
         }
         return _newAccumulatedRewardPerShare;
     }
