@@ -398,4 +398,33 @@ describe("TellorFlex e2e Tests", function () {
     it("TBR, stakes, and staking rewards can't borrow from each other", async function () {
         console.log("sup")
     })
+
+    it("TBR, stakes, and staking rewards reach 0", async function () {
+        // Setup
+        await token.mint(accounts[1].address, web3.utils.toWei("301"))
+        await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("301"))
+
+        // Check balance after adding time-based rewards, stake, & staking rewards
+        await token.mint(tellor.address, web3.utils.toWei("100")) // add tb rewards
+        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("100"))
+        await tellor.connect(accounts[1]).addStakingRewards(web3.utils.toWei("100"))
+        tellorBalance1 = await token.balanceOf(tellor.address)
+        expect(tellorBalance1).to.equal(web3.utils.toWei("300"))
+
+        // Zero time-based rewards & check updated balance
+        h.advanceTime(60 * 1000)
+        await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
+        await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(420), 0, TRB_QUERY_DATA)
+        rewardsGiven = web3.utils.toWei("100") - await tellor.totalTimeBasedRewardsBalance()
+        expect(await token.balanceOf(tellor.address)).to.equal(web3.utils.toWei("200"))
+
+        // Check balance after zeroing stakes & staking rewards
+        h.advanceTime(60 * 60 * 24 * 30) // reduce totalStakingRewards to 0
+        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("1"))
+        expect(await token.balanceOf(tellor.address)).to.equal(web3.utils.toWei("101"))
+        await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("101"))
+        h.advanceTime(60 * 60 * 24 * 7) // 7 days
+        await tellor.connect(accounts[1]).withdrawStake()
+        expect(await token.balanceOf(tellor.address)).to.equal(0)
+    })
 })
