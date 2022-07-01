@@ -134,6 +134,7 @@ contract TellorFlex {
         StakeInfo storage _staker = stakerDetails[msg.sender];
         if (_staker.lockedBalance > 0) {
             if (_staker.lockedBalance >= _amount) {
+                // if staker's locked balance covers full _amount, use that
                 _staker.lockedBalance -= _amount;
             } else {
                 require(
