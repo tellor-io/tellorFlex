@@ -381,8 +381,30 @@ describe("TellorFlex e2e Tests", function () {
         tellorBalance2 = await token.balanceOf(tellor.address)
         expect(tellorBalance2).to.equal(BigInt(tellorBalance1) - BigInt(rewardsGiven))
 
-        // Reduce stakes & check balance
-
+        // Check balance after reducing stakes & staking rewards
+        stakingRewards1 = await tellor.stakingRewardsBalance()
+        totalStakes1 = await tellor.totalStakeAmount()
+        console.log("stakingRewards1", stakingRewards1)
+        console.log("totalStakes1", totalStakes1)
+        await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("10"))
+        // need to withdraw the stake to affect tellor balance
+        stakingRewards2 = await tellor.stakingRewardsBalance()
+        totalStakes2 = await tellor.totalStakeAmount()
+        console.log("stakingRewards2", stakingRewards2)
+        console.log("totalStakes2", totalStakes2)
+        stakingRewardsLoss = stakingRewards1 - stakingRewards2
+        stakesLoss = totalStakes1 - totalStakes2
+        console.log("stakingRewardsLoss", stakingRewardsLoss)
+        console.log("stakesLoss", stakesLoss)
+        totalLoss = stakingRewardsLoss + stakesLoss
+        tellorBalance3 = await token.balanceOf(tellor.address)
+        console.log("prev balance", tellorBalance2)
+        console.log("latest balance", tellorBalance3)
+        console.log("total loss", totalLoss)
+        balanceDiff = tellorBalance2 - tellorBalance3
+        console.log("prev bal - current balance", balanceDiff)
+        expect(balanceDiff).to.equal(stakingRewardsLoss)
+        // expect(tellorBalance2).to.equal(tellorBalance3 + stakingRewardsLoss)
     })
 
     it("TBR, stakes, and staking rewards can't borrow from each other", async function () {
