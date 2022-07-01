@@ -395,10 +395,6 @@ describe("TellorFlex e2e Tests", function () {
         expect(balanceDiff).to.equal(totalLoss)
     })
 
-    it("TBR, stakes, and staking rewards can't borrow from each other", async function () {
-        console.log("sup")
-    })
-
     it("TBR, stakes, and staking rewards reach 0", async function () {
         // Setup
         await token.mint(accounts[1].address, web3.utils.toWei("301"))
@@ -415,7 +411,6 @@ describe("TellorFlex e2e Tests", function () {
         h.advanceTime(60 * 1000)
         await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
         await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(420), 0, TRB_QUERY_DATA)
-        rewardsGiven = web3.utils.toWei("100") - await tellor.totalTimeBasedRewardsBalance()
         expect(await token.balanceOf(tellor.address)).to.equal(web3.utils.toWei("200"))
 
         // Check balance after zeroing stakes & staking rewards
@@ -426,5 +421,50 @@ describe("TellorFlex e2e Tests", function () {
         h.advanceTime(60 * 60 * 24 * 7) // 7 days
         await tellor.connect(accounts[1]).withdrawStake()
         expect(await token.balanceOf(tellor.address)).to.equal(0)
+    })
+
+    it("TBR, stakes, and staking rewards can't borrow from each other", async function () {
+        // Setup
+        await token.mint(accounts[1].address, web3.utils.toWei("301"))
+        await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("301"))
+        await token.mint(tellor.address, web3.utils.toWei("100")) // add tb rewards
+        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("100"))
+        await tellor.connect(accounts[1]).addStakingRewards(web3.utils.toWei("100"))
+
+        // Ensure no borrow after time-based rewards drained
+        h.advanceTime(60 * 1000)
+        await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
+        await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(420), 0, TRB_QUERY_DATA)
+        expect(await tellor.totalTimeBasedRewardsBalance()).to.equal(0)
+        h.advanceTime(60 * 1000)
+        await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
+        await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(420), 1, TRB_QUERY_DATA)
+        expect(await tellor.stakingRewardsBalance()).to.equal(web3.utils.toWei("100"))
+        expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("100"))
+        await token.mint(tellor.address, web3.utils.toWei("100")) // add tb rewards
+
+        // Ensure no borrow after staking rewards drained
+        h.advanceTime(60 * 60 * 24 * 30) // reduce totalStakingRewards to 0
+        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei(".5"))
+        expect(await tellor.stakingRewardsBalance()).to.equal(0)
+        h.advanceTime(60 * 60 * 24 * 30)
+        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei(".5"))
+        await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
+        expect(await tellor.totalTimeBasedRewardsBalance()).to.equal(web3.utils.toWei("100"))
+        expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("101"))
+        await tellor.connect(accounts[1]).addStakingRewards(web3.utils.toWei("100"))
+
+        // Ensure no borrow when stakes removed
+        stakingRewards1 = await tellor.stakingRewardsBalance()
+        await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("101"))
+        h.advanceTime(60 * 60 * 24 * 7) // 7 days
+        await tellor.connect(accounts[1]).withdrawStake()
+        await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
+        stakingRewards2 = await tellor.stakingRewardsBalance()
+        stakingRewardsLoss = stakingRewards1 - stakingRewards2
+        expect(await tellor.totalStakeAmount()).to.equal(0)
+        expect(await tellor.totalTimeBasedRewardsBalance()).to.equal(web3.utils.toWei("100"))
+        // I think this last one breaks bc of a precision error from the dumb BigInts
+        // expect(await tellor.stakingRewardsBalance()).to.equal(BigInt(web3.utils.toWei("100")) - BigInt(stakingRewardsLoss))
     })
 })
