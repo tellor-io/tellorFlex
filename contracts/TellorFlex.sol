@@ -104,7 +104,6 @@ contract TellorFlex {
         stakeAmount = (_stakeAmountDollarTarget * 10**18) / _priceTRB;
     }
 
-
     function init(address _governanceAddress) external {
         require(msg.sender == owner);
         require(governance == address(0));
@@ -288,9 +287,14 @@ contract TellorFlex {
         // Disperse Time Based Reward
         uint256 _timeDiff = block.timestamp - timeOfLastNewValue;
         uint256 _reward = (_timeDiff * timeBasedReward) / 300; //.5 TRB per 5 minutes
-        if (_reward > 0 && totalTimeBasedRewardsBalance > _reward) {
-            token.transfer(msg.sender, _reward);
-            totalTimeBasedRewardsBalance -= _reward;
+        if (_reward > 0) {
+            if (totalTimeBasedRewardsBalance < _reward) {
+                token.transfer(msg.sender, totalTimeBasedRewardsBalance);
+                totalTimeBasedRewardsBalance = 0;
+            } else {
+                token.transfer(msg.sender, _reward);
+                totalTimeBasedRewardsBalance -= _reward;
+            }
         }
         // Update last oracle value and number of values submitted by a reporter
         timeOfLastNewValue = block.timestamp;
@@ -313,7 +317,10 @@ contract TellorFlex {
         );
         if (_valFound) {
             uint256 _priceTRB = abi.decode(_val, (uint256));
-            require(_priceTRB >= 0.01 ether && _priceTRB < 1000000 ether, "invalid trb price");
+            require(
+                _priceTRB >= 0.01 ether && _priceTRB < 1000000 ether,
+                "invalid trb price"
+            );
             stakeAmount = (stakeAmountDollarTarget * 10**18) / _priceTRB;
             emit NewStakeAmount(stakeAmount);
         }
