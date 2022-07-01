@@ -595,7 +595,7 @@ describe("TellorFlex Function Tests", function () {
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
 
-		for(i = 0; i < 100; i++) {
+		for(i = 0; i < 50; i++) {
 			await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100 + i), 0, '0x')
 			await h.advanceTime(60 * 60 * 12)
 		}
@@ -649,8 +649,8 @@ describe("TellorFlex Function Tests", function () {
 		expect(dataBefore[1]).to.equal(h.bytes(150))
 		expect(dataBefore[2]).to.equal(blocky1.timestamp)
 
-		// submit 100 values and test
-		for(i = 0; i < 100; i++) {
+		// submit 50 values and test
+		for(i = 0; i < 50; i++) {
 			await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100 + i), 0, '0x')
 			await h.advanceTime(60 * 60 * 12)
 		}
@@ -788,7 +788,8 @@ describe("TellorFlex Function Tests", function () {
 
 		// deposit another stake
 		await token.mint(accounts[1].address, h.toWei("100"))
-		await tellor.connect(accounts[1]).depositStake(h.toWei("50"))
+		// await tellor.connect(accounts[1]).depositStake(h.toWei("50"))
+		await tellor.updateRewards()
 		blocky3 = await h.getBlock()
 
 		expect(await tellor.timeOfLastAllocation()).to.equal(blocky3.timestamp)
@@ -801,7 +802,23 @@ describe("TellorFlex Function Tests", function () {
 
 		// update rewards
 		await tellor.updateRewards()
+		blocky4 = await h.getBlock()
 
+		expect(await tellor.timeOfLastAllocation()).to.equal(blocky4.timestamp)
+		expect(await tellor.rewardRate()).to.equal(0) // rewards ran out, reward rate should be 0
+		expAccumRewPerShare = BigInt(h.toWei("1000")) / BigInt(100)
+		expect(await tellor.accumulatedRewardPerShare()).to.equal(expAccumRewPerShare)
 
+		// advance time 1 day
+		await h.advanceTime(86400)
+
+		// update rewards
+		await tellor.updateRewards()
+		blocky4 = await h.getBlock()
+
+		// checks, should be no change
+		expect(await tellor.timeOfLastAllocation()).to.equal(blocky4.timestamp) // should update to latest updateRewards ts
+		expect(await tellor.rewardRate()).to.equal(0) // should still be zero
+		expect(await tellor.accumulatedRewardPerShare()).to.equal(expAccumRewPerShare) // shouldn't change
 	})
 });
