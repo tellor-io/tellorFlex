@@ -665,6 +665,10 @@ describe("TellorFlex Function Tests", function () {
 		expect(dataBefore[1]).to.equal(h.bytes(150))
 		expect(dataBefore[2]).to.equal(blocky1.timestamp)
 	})
+	
+	it("verify()", async function() {
+		expect(await tellor.verify()).to.equal(9999)
+	})
 
 	it("updateStakeAmount()", async function () {
 		// Setup
@@ -822,7 +826,7 @@ describe("TellorFlex Function Tests", function () {
 		expect(await tellor.accumulatedRewardPerShare()).to.equal(expAccumRewPerShare) // shouldn't change
 	})
 
-	it.only("_updateStakeAndPayRewards", async function () {
+	it("_updateStakeAndPayRewards", async function () {
         await token.mint(accounts[0].address, web3.utils.toWei("1000"))
         await token.approve(tellor.address, web3.utils.toWei("1000"))
         // check initial conditions
