@@ -21,8 +21,7 @@ contract TellorFlex {
     uint256 public timeBasedReward = 5e17;
     uint256 public stakeAmount; //amount required to be a staker
     uint256 public stakeAmountDollarTarget; // amount of US dollars required to be a staker
-    bytes32 public stakingTokenPriceQueryId;// =
-        // keccak256(abi.encode("SpotPrice", abi.encode("trb", "usd")));
+    bytes32 public stakingTokenPriceQueryId; // staking token SpotPrice queryId
     uint256 public totalStakeAmount; //total amount of tokens locked in contract (via stake)
     uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
     uint256 public timeOfLastNewValue = block.timestamp; // time of the last new submitted value, originally set to the block timestamp
@@ -765,8 +764,13 @@ contract TellorFlex {
         // if staking rewards run out, calculate remaining reward per staked
         // token and set rewardRate to 0
         if (_accumulatedReward >= stakingRewardsBalance) {
-            uint256 _newPendingRewards = stakingRewardsBalance - ((accumulatedRewardPerShare * totalStakeAmount) / 1e18 - totalRewardDebt);
-            accumulatedRewardPerShare += (_newPendingRewards * 1e18) / totalStakeAmount;
+            uint256 _newPendingRewards = stakingRewardsBalance -
+                ((accumulatedRewardPerShare * totalStakeAmount) /
+                    1e18 -
+                    totalRewardDebt);
+            accumulatedRewardPerShare +=
+                (_newPendingRewards * 1e18) /
+                totalStakeAmount;
             rewardRate = 0;
         } else {
             accumulatedRewardPerShare = _newAccumulatedRewardPerShare;
@@ -855,8 +859,14 @@ contract TellorFlex {
             1e18 -
             totalRewardDebt;
         if (_accumulatedReward >= stakingRewardsBalance) {
-            uint256 _newPendingRewards = stakingRewardsBalance - ((accumulatedRewardPerShare * totalStakeAmount) / 1e18 - totalRewardDebt);
-            _newAccumulatedRewardPerShare = accumulatedRewardPerShare + (_newPendingRewards * 1e18) / totalStakeAmount;
+            uint256 _newPendingRewards = stakingRewardsBalance -
+                ((accumulatedRewardPerShare * totalStakeAmount) /
+                    1e18 -
+                    totalRewardDebt);
+            _newAccumulatedRewardPerShare =
+                accumulatedRewardPerShare +
+                (_newPendingRewards * 1e18) /
+                totalStakeAmount;
         }
         return _newAccumulatedRewardPerShare;
     }
