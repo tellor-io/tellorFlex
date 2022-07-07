@@ -14,9 +14,9 @@ describe("TellorFlex e2e Tests - Two", function() {
 	let token;
 	let accounts;
     let owner;
-	const STAKE_AMOUNT_USD_TARGET = web3.utils.toWei("500");
-    const PRICE_TRB = web3.utils.toWei("50");
-	const REQUIRED_STAKE = web3.utils.toWei((parseInt(web3.utils.fromWei(STAKE_AMOUNT_USD_TARGET)) / parseInt(web3.utils.fromWei(PRICE_TRB))).toString());
+	const STAKE_AMOUNT_USD_TARGET = h.toWei("500");
+    const PRICE_TRB = h.toWei("50");
+	const REQUIRED_STAKE = h.toWei((parseInt(web3.utils.fromWei(STAKE_AMOUNT_USD_TARGET)) / parseInt(web3.utils.fromWei(PRICE_TRB))).toString());
 	const REPORTING_LOCK = 43200; // 12 hours
     const REWARD_RATE_TARGET = 60 * 60 * 24 * 30; // 30 days
     const abiCoder = new ethers.utils.AbiCoder
@@ -48,8 +48,8 @@ describe("TellorFlex e2e Tests - Two", function() {
         owner = await ethers.getSigner(await tellor.owner())
 		await tellor.deployed();
         await governance.setTellorAddress(tellor.address);
-		await token.mint(accounts[1].address, web3.utils.toWei("1000"));
-        await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
+		await token.mint(accounts[1].address, h.toWei("1000"));
+        await token.connect(accounts[1]).approve(tellor.address, h.toWei("1000"))
         await hre.network.provider.request({
             method: "hardhat_impersonateAccount",
             params: [governance.address]}
@@ -60,7 +60,7 @@ describe("TellorFlex e2e Tests - Two", function() {
         await tellor.connect(owner).init(governance.address)
 	});
     it("Staked multiple times, disputed but keeps reporting", async function() {
-        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("30"))
+        await tellor.connect(accounts[1]).depositStake(h.toWei("30"))
         await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
 		let blocky = await h.getBlock()
 		expect(await tellor.getNewValueCountbyQueryId(h.uintTob32(1))).to.equal(1)
@@ -72,18 +72,18 @@ describe("TellorFlex e2e Tests - Two", function() {
         await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x'))
         await h.advanceTime(86400/2/3)
         let vars = await tellor.getStakerInfo(accounts[1].address)
-        assert(vars[1] == web3.utils.toWei("20"), "should still have money staked")
+        assert(vars[1] == h.toWei("20"), "should still have money staked")
     })
     it("Realistic test with staking rewards and disputes", async function() {
-        await token.mint(accounts[0].address, web3.utils.toWei("1000"))
-        await token.approve(tellor.address, web3.utils.toWei("1000"))
+        await token.mint(accounts[0].address, h.toWei("1000"))
+        await token.approve(tellor.address, h.toWei("1000"))
         // check initial conditions
         expect(await tellor.stakingRewardsBalance()).to.equal(0)
         expect(await tellor.rewardRate()).to.equal(0)
         // add staking rewards
-        await tellor.addStakingRewards(web3.utils.toWei("1000"))
+        await tellor.addStakingRewards(h.toWei("1000"))
         // check conditions after adding rewards
-        expect(await tellor.stakingRewardsBalance()).to.equal(web3.utils.toWei("1000"))
+        expect(await tellor.stakingRewardsBalance()).to.equal(h.toWei("1000"))
         expect(await tellor.totalRewardDebt()).to.equal(0)
         expectedRewardRate = Math.floor(h.toWei("1000") / REWARD_RATE_TARGET)
         expect(await tellor.rewardRate()).to.equal(expectedRewardRate)
@@ -92,16 +92,16 @@ describe("TellorFlex e2e Tests - Two", function() {
         await governance.beginDisputeMock()
         await governance.connect(accounts[1]).voteMock(1)
         // deposit stake
-        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
+        await tellor.connect(accounts[1]).depositStake(h.toWei("10"))
         blocky0 = await h.getBlock()
         // check conditions after depositing stake
-        expect(await tellor.stakingRewardsBalance()).to.equal(web3.utils.toWei("1000"))
-        expect(await tellor.getTotalStakeAmount()).to.equal(web3.utils.toWei("10"))
+        expect(await tellor.stakingRewardsBalance()).to.equal(h.toWei("1000"))
+        expect(await tellor.getTotalStakeAmount()).to.equal(h.toWei("10"))
         expect(await tellor.totalRewardDebt()).to.equal(0)
         expect(await tellor.accumulatedRewardPerShare()).to.equal(0)
         expect(await tellor.timeOfLastAllocation()).to.equal(blocky0.timestamp)
         stakerInfo = await tellor.getStakerInfo(accounts[1].address)
-        expect(stakerInfo[smap.stakedBalance]).to.equal(web3.utils.toWei("10")) // staked balance
+        expect(stakerInfo[smap.stakedBalance]).to.equal(h.toWei("10")) // staked balance
         expect(stakerInfo[smap.rewardDebt]).to.equal(0) // rewardDebt
         expect(stakerInfo[smap.startVoteCount]).to.equal(2) // startVoteCount
         expect(stakerInfo[7]).to.equal(1) // startVoteTally
@@ -169,38 +169,37 @@ describe("TellorFlex e2e Tests - Two", function() {
         expect(await tellor.stakingRewardsBalance()).to.equal(BN(h.toWei("1000")).sub(expectedBalance).add(h.toWei("990")))
     })
     it("two accounts stake (one 10 TRB one 20 TRB), does account2 have double reward debt?", async function() {
-        // Params to check
-        //     - Global:
-        //         - rewardRate
-        //         - accumulatedRewardPerShare
-        //         - timeOfLastAllocation
-        //         - totalRewardDebt
-        //         - stakingRewardsBalance
-        //     - Per Staker
-        //         - Staked balance
-        //         - Reward debt
-        //         - startVoteCount
-        //         - startVoteTally"
-
-        await token.mint(accounts[0].address, web3.utils.toWei("1000"))
-        await token.approve(tellor.address, web3.utils.toWei("1000"))
+        await token.mint(accounts[0].address, h.toWei("1000"))
+        await token.approve(tellor.address, h.toWei("1000"))
         // check initial conditions
         expect(await tellor.stakingRewardsBalance()).to.equal(0)
         expect(await tellor.rewardRate()).to.equal(0)
         expect(await tellor.totalRewardDebt()).to.equal(0)
         // add staking rewards
-        await tellor.addStakingRewards(web3.utils.toWei("1000"))
+        await tellor.addStakingRewards(h.toWei("1000"))
         // check conditions after adding rewards
-        expect(await tellor.stakingRewardsBalance()).to.equal(web3.utils.toWei("1000"))
+        expect(await tellor.stakingRewardsBalance()).to.equal(h.toWei("1000"))
         expect(await tellor.totalRewardDebt()).to.equal(0)
         expectedRewardRate = Math.floor(h.toWei("1000") / REWARD_RATE_TARGET)
         expect(await tellor.rewardRate()).to.equal(expectedRewardRate)
-        // create 2 mock disputes, vote once
-        await governance.beginDisputeMock()
-        await governance.beginDisputeMock()
-        await governance.connect(accounts[1]).voteMock(1)
-        // deposit stake
-        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
-        blocky0 = await h.getBlock()
+        
+        // deposit 2 stakes
+        await tellor.connect(accounts[1]).depositStake(h.toWei("10"))
+        blocky1 = await h.getBlock()
+        await token.mint(accounts[2].address, h.toWei("20"))
+        await token.connect(accounts[2]).approve(tellor.address, h.toWei("20"))
+        await tellor.connect(accounts[2]).depositStake(h.toWei("20"))
+
+        await h.advanceTime(86400 * 7)
+
+        // update rewards by depositing 0 stake
+        await tellor.connect(accounts[1]).depositStake(0)
+        await tellor.connect(accounts[2]).depositStake(0)
+
+        stakerInfo1 = await tellor.getStakerInfo(accounts[1].address)
+        stakerInfo2 = await tellor.getStakerInfo(accounts[2].address)
+
+        ratio = BigInt(stakerInfo2[smap.rewardDebt]) / BigInt(stakerInfo1[smap.rewardDebt])
+        expect(ratio).to.equal(BigInt(2))
     })
 })

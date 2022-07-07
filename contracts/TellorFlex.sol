@@ -341,8 +341,14 @@ contract TellorFlex {
     function withdrawStake() external {
         StakeInfo storage _staker = stakerDetails[msg.sender];
         // Ensure reporter is locked and that enough time has passed
-        require(block.timestamp - _staker.startDate >= 7 days, "7 days didn't pass");
-        require(_staker.lockedBalance > 0, "reporter not locked for withdrawal");
+        require(
+            block.timestamp - _staker.startDate >= 7 days,
+            "7 days didn't pass"
+        );
+        require(
+            _staker.lockedBalance > 0,
+            "reporter not locked for withdrawal"
+        );
         token.transfer(msg.sender, _staker.lockedBalance);
         _staker.lockedBalance = 0;
         emit StakeWithdrawn(msg.sender);
@@ -384,6 +390,35 @@ contract TellorFlex {
                     reports[_queryId].timestamps.length - 1
                 ]
             ];
+    }
+
+    /**
+     * @dev Retrieves the latest value for the queryId before the specified timestamp
+     * @param _queryId is the queryId to look up the value for
+     * @param _timestamp before which to search for latest value
+     * @return _ifRetrieve bool true if able to retrieve a non-zero value
+     * @return _value the value retrieved
+     * @return _timestampRetrieved the value's timestamp
+     */
+    function getDataBefore(bytes32 _queryId, uint256 _timestamp)
+        public
+        view
+        returns (
+            bool _ifRetrieve,
+            bytes memory _value,
+            uint256 _timestampRetrieved
+        )
+    {
+        (bool _found, uint256 _index) = getIndexForDataBefore(
+            _queryId,
+            _timestamp
+        );
+        if (!_found) return (false, bytes(""), 0);
+        uint256 _time = getTimestampbyQueryIdandIndex(_queryId, _index);
+        _value = retrieveData(_queryId, _time);
+        if (keccak256(_value) != keccak256(bytes("")))
+            return (true, _value, _time);
+        return (false, bytes(""), 0);
     }
 
     /**
@@ -660,35 +695,6 @@ contract TellorFlex {
         returns (uint256)
     {
         return reports[_queryId].timestampIndex[_timestamp];
-    }
-
-    /**
-     * @dev Retrieves the latest value for the queryId before the specified timestamp
-     * @param _queryId is the queryId to look up the value for
-     * @param _timestamp before which to search for latest value
-     * @return _ifRetrieve bool true if able to retrieve a non-zero value
-     * @return _value the value retrieved
-     * @return _timestampRetrieved the value's timestamp
-     */
-    function getDataBefore(bytes32 _queryId, uint256 _timestamp)
-        public
-        view
-        returns (
-            bool _ifRetrieve,
-            bytes memory _value,
-            uint256 _timestampRetrieved
-        )
-    {
-        (bool _found, uint256 _index) = getIndexForDataBefore(
-            _queryId,
-            _timestamp
-        );
-        if (!_found) return (false, bytes(""), 0);
-        uint256 _time = getTimestampbyQueryIdandIndex(_queryId, _index);
-        _value = retrieveData(_queryId, _time);
-        if (keccak256(_value) != keccak256(bytes("")))
-            return (true, _value, _time);
-        return (false, bytes(""), 0);
     }
 
     /**

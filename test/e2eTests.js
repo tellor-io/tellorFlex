@@ -468,7 +468,7 @@ describe("TellorFlex e2e Tests", function () {
         expect(await tellor.stakingRewardsBalance()).to.equal(BigInt(web3.utils.toWei("100")) - BigInt(stakingRewardsLoss))
     })
 
-    it.only("check stake amount given lower and upper bounds on TRB price", async function() {
+    it("check stake amount given lower and upper bounds on TRB price", async function() {
         stakeAmt = await tellor.stakeAmount()
         expect(stakeAmt).to.equal(REQUIRED_STAKE)
 
