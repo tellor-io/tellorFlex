@@ -21,8 +21,8 @@ contract TellorFlex {
     uint256 public timeBasedReward = 5e17;
     uint256 public stakeAmount; //amount required to be a staker
     uint256 public stakeAmountDollarTarget; // amount of US dollars required to be a staker
-    bytes32 public trbUsdSpotPriceQueryId =
-        keccak256(abi.encode("SpotPrice", abi.encode("trb", "usd")));
+    bytes32 public stakingTokenPriceQueryId;// =
+        // keccak256(abi.encode("SpotPrice", abi.encode("trb", "usd")));
     uint256 public totalStakeAmount; //total amount of tokens locked in contract (via stake)
     uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
     uint256 public timeOfLastNewValue = block.timestamp; // time of the last new submitted value, originally set to the block timestamp
@@ -89,12 +89,14 @@ contract TellorFlex {
      * @param _reportingLock base amount of time (seconds) before reporter is able to report again
      * @param _stakeAmountDollarTarget fixed amount of dollars that TRB stake amount is worth
      * @param _priceTRB price of TRB in USD
+     * @param _stakingTokenPriceQueryId queryId where staking token price is reported
      */
     constructor(
         address _token,
         uint256 _reportingLock,
         uint256 _stakeAmountDollarTarget,
-        uint256 _priceTRB
+        uint256 _priceTRB,
+        bytes32 _stakingTokenPriceQueryId
     ) {
         require(_token != address(0), "must set token address");
         token = IERC20(_token);
@@ -102,6 +104,7 @@ contract TellorFlex {
         reportingLock = _reportingLock;
         stakeAmountDollarTarget = _stakeAmountDollarTarget;
         stakeAmount = (_stakeAmountDollarTarget * 10**18) / _priceTRB;
+        stakingTokenPriceQueryId = _stakingTokenPriceQueryId;
     }
 
     function init(address _governanceAddress) external {
@@ -313,7 +316,7 @@ contract TellorFlex {
 
     function updateStakeAmount() external {
         (bool _valFound, bytes memory _val, ) = getDataBefore(
-            trbUsdSpotPriceQueryId,
+            stakingTokenPriceQueryId,
             block.timestamp - 12 hours
         );
         if (_valFound) {
