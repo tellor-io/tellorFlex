@@ -288,7 +288,7 @@ contract TellorFlex {
         // Disperse Time Based Reward
         uint256 _timeDiff = block.timestamp - timeOfLastNewValue;
         uint256 _reward = (_timeDiff * timeBasedReward) / 300; //.5 TRB per 5 minutes
-        if (_reward > 0) {
+        if (_reward > 0 && totalTimeBasedRewardsBalance > 0) {
             if (totalTimeBasedRewardsBalance < _reward) {
                 token.transfer(msg.sender, totalTimeBasedRewardsBalance);
                 totalTimeBasedRewardsBalance = 0;
@@ -725,6 +725,13 @@ contract TellorFlex {
         returns (bytes memory)
     {
         return reports[_queryId].valueByTimestamp[_timestamp];
+    }
+
+    /**
+     * @dev Used during the upgrade process to verify valid Tellor Contracts
+     */
+    function verify() external pure returns (uint256) {
+        return 9999;
     }
 
     // *****************************************************************************
