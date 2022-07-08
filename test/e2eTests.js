@@ -4,6 +4,7 @@ const h = require("./helpers/helpers");
 var assert = require('assert');
 const web3 = require('web3');
 const { prependOnceListener } = require("process");
+const { stakeAmount } = require("./helpers/helpers");
 const BN = ethers.BigNumber.from
 
 describe("TellorFlex e2e Tests", function () {
@@ -465,5 +466,55 @@ describe("TellorFlex e2e Tests", function () {
         expect(await tellor.totalStakeAmount()).to.equal(0)
         expect(await tellor.totalTimeBasedRewardsBalance()).to.equal(web3.utils.toWei("100"))
         expect(await tellor.stakingRewardsBalance()).to.equal(BigInt(web3.utils.toWei("100")) - BigInt(stakingRewardsLoss))
+    })
+
+    it("check stake amount given lower and upper bounds on TRB price", async function() {
+        stakeAmt = await tellor.stakeAmount()
+        expect(stakeAmt).to.equal(REQUIRED_STAKE)
+
+        // Setup
+        await token.mint(accounts[1].address, web3.utils.toWei("1000"));
+        await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
+        await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("1000"))
+
+        // Test no reported TRB price
+        await tellor.updateStakeAmount()
+        expect(await tellor.stakeAmount()).to.equal(REQUIRED_STAKE)
+
+        // Test reported TRB price outside limits - high
+		highPrice = h.toWei("1000001")
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(highPrice), 0, TRB_QUERY_DATA)
+		await h.advanceTime(86400/2)
+		await h.expectThrow(tellor.updateStakeAmount())
+		expect(await tellor.stakeAmount()).to.equal(REQUIRED_STAKE) 
+
+		// Test reported TRB price outside limits - low
+		lowPrice = h.toWei("0.009")
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(lowPrice), 0, TRB_QUERY_DATA)
+		await h.advanceTime(86400/2)
+		await h.expectThrow(tellor.updateStakeAmount())
+		expect(await tellor.stakeAmount()).to.equal(REQUIRED_STAKE) 
+
+		h.advanceTime(86400/2)
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(PRICE_TRB * 7), 0, TRB_QUERY_DATA)
+		h.advanceTime(86400/2 + 1)
+        await tellor.updateStakeAmount()
+        expect(await tellor.stakeAmount()).to.equal(BigInt(REQUIRED_STAKE) / BigInt(7))
+
+        // Test reported TRB price inside limits - high
+        highPrice = h.toWei("999999")
+        await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(highPrice), 0, TRB_QUERY_DATA)
+        await h.advanceTime(86400/2)
+        await tellor.updateStakeAmount()
+        expectedStakeAmount = BigInt(STAKE_AMOUNT_USD_TARGET) * BigInt(1e18) / BigInt(highPrice);
+        expect(await tellor.stakeAmount()).to.equal(expectedStakeAmount)
+
+        // Test reported TRB price inside limits - low
+        lowPrice = h.toWei("0.01")
+        await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(lowPrice), 0, TRB_QUERY_DATA)
+        await h.advanceTime(86400/2)
+        await tellor.updateStakeAmount()
+        expectedStakeAmount = BigInt(STAKE_AMOUNT_USD_TARGET) * BigInt(1e18) / BigInt(lowPrice);
+        expect(await tellor.stakeAmount()).to.equal(expectedStakeAmount)
     })
 })

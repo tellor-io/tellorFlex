@@ -102,7 +102,7 @@ contract TellorFlex {
         owner = msg.sender;
         reportingLock = _reportingLock;
         stakeAmountDollarTarget = _stakeAmountDollarTarget;
-        stakeAmount = (_stakeAmountDollarTarget * 10**18) / _priceTRB;
+        stakeAmount = (_stakeAmountDollarTarget * 1e18) / _priceTRB;
         stakingTokenPriceQueryId = _stakingTokenPriceQueryId;
     }
 
@@ -170,19 +170,19 @@ contract TellorFlex {
      */
     function removeValue(bytes32 _queryId, uint256 _timestamp) external {
         require(msg.sender == governance, "caller must be governance address");
-        Report storage rep = reports[_queryId];
-        uint256 _index = rep.timestampIndex[_timestamp];
-        require(_timestamp == rep.timestamps[_index], "invalid timestamp");
+        Report storage _report = reports[_queryId];
+        uint256 _index = _report.timestampIndex[_timestamp];
+        require(_timestamp == _report.timestamps[_index], "invalid timestamp");
         // Shift all timestamps back to reflect deletion of value
-        for (uint256 _i = _index; _i < rep.timestamps.length - 1; _i++) {
-            rep.timestamps[_i] = rep.timestamps[_i + 1];
-            rep.timestampIndex[rep.timestamps[_i]] -= 1;
+        for (uint256 _i = _index; _i < _report.timestamps.length - 1; _i++) {
+            _report.timestamps[_i] = _report.timestamps[_i + 1];
+            _report.timestampIndex[_report.timestamps[_i]] -= 1;
         }
         // Delete and reset timestamp and value
-        delete rep.timestamps[rep.timestamps.length - 1];
-        rep.timestamps.pop();
-        rep.valueByTimestamp[_timestamp] = "";
-        rep.timestampIndex[_timestamp] = 0;
+        delete _report.timestamps[_report.timestamps.length - 1];
+        _report.timestamps.pop();
+        _report.valueByTimestamp[_timestamp] = "";
+        _report.timestampIndex[_timestamp] = 0;
         emit ValueRemoved(_queryId, _timestamp);
     }
 
@@ -255,9 +255,9 @@ contract TellorFlex {
         uint256 _nonce,
         bytes calldata _queryData
     ) external {
-        Report storage rep = reports[_queryId];
+        Report storage _report = reports[_queryId];
         require(
-            _nonce == rep.timestamps.length || _nonce == 0,
+            _nonce == _report.timestamps.length || _nonce == 0,
             "nonce must match timestamp index"
         );
         StakeInfo storage _staker = stakerDetails[msg.sender];
@@ -278,15 +278,15 @@ contract TellorFlex {
         _staker.reporterLastTimestamp = block.timestamp;
         // Checks for no double reporting of timestamps
         require(
-            rep.reporterByTimestamp[block.timestamp] == address(0),
+            _report.reporterByTimestamp[block.timestamp] == address(0),
             "timestamp already reported for"
         );
         // Update number of timestamps, value for given timestamp, and reporter for timestamp
-        rep.timestampIndex[block.timestamp] = rep.timestamps.length;
-        rep.timestamps.push(block.timestamp);
-        rep.timestampToBlockNum[block.timestamp] = block.number;
-        rep.valueByTimestamp[block.timestamp] = _value;
-        rep.reporterByTimestamp[block.timestamp] = msg.sender;
+        _report.timestampIndex[block.timestamp] = _report.timestamps.length;
+        _report.timestamps.push(block.timestamp);
+        _report.timestampToBlockNum[block.timestamp] = block.number;
+        _report.valueByTimestamp[block.timestamp] = _value;
+        _report.reporterByTimestamp[block.timestamp] = msg.sender;
         // Disperse Time Based Reward
         uint256 _timeDiff = block.timestamp - timeOfLastNewValue;
         uint256 _reward = (_timeDiff * timeBasedReward) / 300; //.5 TRB per 5 minutes
@@ -324,7 +324,7 @@ contract TellorFlex {
                 _priceTRB >= 0.01 ether && _priceTRB < 1000000 ether,
                 "invalid trb price"
             );
-            stakeAmount = (stakeAmountDollarTarget * 10**18) / _priceTRB;
+            stakeAmount = (stakeAmountDollarTarget * 1e18) / _priceTRB;
             emit NewStakeAmount(stakeAmount);
         }
     }
@@ -339,12 +339,18 @@ contract TellorFlex {
      * @dev Withdraws a reporter's stake
      */
     function withdrawStake() external {
-        StakeInfo storage _s = stakerDetails[msg.sender];
+        StakeInfo storage _staker = stakerDetails[msg.sender];
         // Ensure reporter is locked and that enough time has passed
-        require(block.timestamp - _s.startDate >= 7 days, "7 days didn't pass");
-        require(_s.lockedBalance > 0, "reporter not locked for withdrawal");
-        token.transfer(msg.sender, _s.lockedBalance);
-        _s.lockedBalance = 0;
+        require(
+            block.timestamp - _staker.startDate >= 7 days,
+            "7 days didn't pass"
+        );
+        require(
+            _staker.lockedBalance > 0,
+            "reporter not locked for withdrawal"
+        );
+        token.transfer(msg.sender, _staker.lockedBalance);
+        _staker.lockedBalance = 0;
         emit StakeWithdrawn(msg.sender);
     }
 
@@ -384,6 +390,35 @@ contract TellorFlex {
                     reports[_queryId].timestamps.length - 1
                 ]
             ];
+    }
+
+    /**
+     * @dev Retrieves the latest value for the queryId before the specified timestamp
+     * @param _queryId is the queryId to look up the value for
+     * @param _timestamp before which to search for latest value
+     * @return _ifRetrieve bool true if able to retrieve a non-zero value
+     * @return _value the value retrieved
+     * @return _timestampRetrieved the value's timestamp
+     */
+    function getDataBefore(bytes32 _queryId, uint256 _timestamp)
+        public
+        view
+        returns (
+            bool _ifRetrieve,
+            bytes memory _value,
+            uint256 _timestampRetrieved
+        )
+    {
+        (bool _found, uint256 _index) = getIndexForDataBefore(
+            _queryId,
+            _timestamp
+        );
+        if (!_found) return (false, bytes(""), 0);
+        uint256 _time = getTimestampbyQueryIdandIndex(_queryId, _index);
+        _value = retrieveData(_queryId, _time);
+        if (keccak256(_value) != keccak256(bytes("")))
+            return (true, _value, _time);
+        return (false, bytes(""), 0);
     }
 
     /**
@@ -660,35 +695,6 @@ contract TellorFlex {
         returns (uint256)
     {
         return reports[_queryId].timestampIndex[_timestamp];
-    }
-
-    /**
-     * @dev Retrieves the latest value for the queryId before the specified timestamp
-     * @param _queryId is the queryId to look up the value for
-     * @param _timestamp before which to search for latest value
-     * @return _ifRetrieve bool true if able to retrieve a non-zero value
-     * @return _value the value retrieved
-     * @return _timestampRetrieved the value's timestamp
-     */
-    function getDataBefore(bytes32 _queryId, uint256 _timestamp)
-        public
-        view
-        returns (
-            bool _ifRetrieve,
-            bytes memory _value,
-            uint256 _timestampRetrieved
-        )
-    {
-        (bool _found, uint256 _index) = getIndexForDataBefore(
-            _queryId,
-            _timestamp
-        );
-        if (!_found) return (false, bytes(""), 0);
-        uint256 _time = getTimestampbyQueryIdandIndex(_queryId, _index);
-        _value = retrieveData(_queryId, _time);
-        if (keccak256(_value) != keccak256(bytes("")))
-            return (true, _value, _time);
-        return (false, bytes(""), 0);
     }
 
     /**
