@@ -16,6 +16,10 @@ describe("TellorFlex Function Tests -- Init Fn", function() {
     const PRICE_TRB = web3.utils.toWei("50");
 	// const REQUIRED_STAKE = web3.utils.toWei((parseInt(web3.utils.fromWei(STAKE_AMOUNT_USD_TARGET)) / parseInt(web3.utils.fromWei(PRICE_TRB))).toString());
 	const REPORTING_LOCK = 43200; // 12 hours
+    const abiCoder = new ethers.utils.AbiCoder
+	const TRB_QUERY_DATA_ARGS = abiCoder.encode(["string", "string"], ["trb", "usd"])
+	const TRB_QUERY_DATA = abiCoder.encode(["string", "bytes"], ["SpotPrice", TRB_QUERY_DATA_ARGS])
+	const TRB_QUERY_ID = ethers.utils.keccak256(TRB_QUERY_DATA)
 
 	beforeEach(async function () {
 		accounts = await ethers.getSigners();
@@ -27,7 +31,7 @@ describe("TellorFlex Function Tests -- Init Fn", function() {
         governance = await Governance.deploy();
         await governance.deployed();
 		const TellorFlex = await ethers.getContractFactory("TellorFlex");
-		tellor = await TellorFlex.deploy(token.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB);
+		tellor = await TellorFlex.deploy(token.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB, TRB_QUERY_ID);
         owner = await ethers.getSigner(await tellor.owner())
 		await tellor.deployed();
         await governance.setTellorAddress(tellor.address);
