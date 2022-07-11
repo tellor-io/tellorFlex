@@ -15,27 +15,26 @@ import "hardhat/console.sol";
 */
 contract TellorFlex {
     // Storage
-    IERC20 public token;
-    address public owner;
-    address public governance;
-    uint256 public timeBasedReward = 5e17;
-    uint256 public stakeAmount; //amount required to be a staker
-    uint256 public stakeAmountDollarTarget; // amount of US dollars required to be a staker
-    bytes32 public stakingTokenPriceQueryId; // staking token SpotPrice queryId
-    uint256 public totalStakeAmount; //total amount of tokens locked in contract (via stake)
+    IERC20 public token; // token used for staking and rewards
+    address public governance; // address with ability to remove values and slash reporters
+    address public owner; // contract deployer, can call init function once
+    uint256 public accumulatedRewardPerShare; // accumulated staking reward per staked token
     uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
+    uint256 public rewardRate; // total staking rewards released per second
+    uint256 public stakeAmount; // minimum amount required to be a staker
+    uint256 public stakeAmountDollarTarget; // amount of US dollars required to be a staker
+    uint256 public stakingRewardsBalance; // total amount of staking rewards
+    bytes32 public stakingTokenPriceQueryId; // staking token SpotPrice queryId, used for updating stakeAmount
+    uint256 public timeBasedReward = 5e17; // amount of TB rewards released per 5 minutes
+    uint256 public timeOfLastAllocation; // time of last update to accumulatedRewardPerShare
     uint256 public timeOfLastNewValue = block.timestamp; // time of the last new submitted value, originally set to the block timestamp
-    uint256 public rewardRate;
-    uint256 public accumulatedRewardPerShare; // accumulated reward per staked token
-    uint256 public timeOfLastAllocation;
-    uint256 public totalRewardDebt;
-    uint256 public stakingRewardsBalance;
+    uint256 public totalRewardDebt; // staking reward debt, used to calculate real staking rewards balance
+    uint256 public totalStakeAmount; // total amount of tokens locked in contract (via stake)
+    uint256 public totalStakers; // total number of stakers with at least stakeAmount staked, not exact 
     uint256 public totalTimeBasedRewardsBalance; // amount of TBR deposited into Tellor Flex
-    uint256 public totalStakers;
 
     mapping(bytes32 => Report) private reports; // mapping of query IDs to a report
-    mapping(address => StakeInfo) stakerDetails; //mapping from a persons address to their staking info
-    mapping(bytes32 => uint256) lockedTokenPartitions;
+    mapping(address => StakeInfo) stakerDetails; // mapping from a persons address to their staking info
 
     // Structs
     struct Report {
@@ -47,16 +46,16 @@ contract TellorFlex {
     }
 
     struct StakeInfo {
-        uint256 startDate; //stake start date
-        uint256 stakedBalance; // staked balance
+        uint256 startDate; // stake or withdrawal request start date
+        uint256 stakedBalance; // staked token balance
         uint256 lockedBalance; // amount locked for withdrawal
         uint256 rewardDebt; // used for reward calculation
         uint256 reporterLastTimestamp; // timestamp of reporter's last reported value
         uint256 reportsSubmitted; // total number of reports submitted by reporter
         uint256 startVoteCount; // total number of governance votes when stake deposited
         uint256 startVoteTally; // staker vote tally when stake deposited
-        mapping(bytes32 => uint256) reportsSubmittedByQueryId;
         bool staked; // used to keep track of total stakers
+        mapping(bytes32 => uint256) reportsSubmittedByQueryId; // mapping of queryId to number of reports submitted by reporter
     }
 
     // Events
@@ -76,24 +75,25 @@ contract TellorFlex {
         address _reporter,
         address _recipient,
         uint256 _slashAmount
-    );event StakeWithdrawn(address _staker);
+    );
+    event StakeWithdrawn(address _staker);
     event StakeWithdrawRequested(address _staker, uint256 _amount);
     event ValueRemoved(bytes32 _queryId, uint256 _timestamp);
 
     // Functions
     /**
      * @dev Initializes system parameters
-     * @param _token address of token used for staking
+     * @param _token address of token used for staking and rewards
      * @param _reportingLock base amount of time (seconds) before reporter is able to report again
-     * @param _stakeAmountDollarTarget fixed amount of dollars that TRB stake amount is worth
-     * @param _priceTRB price of TRB in USD
+     * @param _stakeAmountDollarTarget fixed USD amount that stakeAmount targets on updateStakeAmount
+     * @param _priceStakingToken current price of staking token in USD
      * @param _stakingTokenPriceQueryId queryId where staking token price is reported
      */
     constructor(
         address _token,
         uint256 _reportingLock,
         uint256 _stakeAmountDollarTarget,
-        uint256 _priceTRB,
+        uint256 _priceStakingToken,
         bytes32 _stakingTokenPriceQueryId
     ) {
         require(_token != address(0), "must set token address");
@@ -101,7 +101,7 @@ contract TellorFlex {
         owner = msg.sender;
         reportingLock = _reportingLock;
         stakeAmountDollarTarget = _stakeAmountDollarTarget;
-        stakeAmount = (_stakeAmountDollarTarget * 1e18) / _priceTRB;
+        stakeAmount = (_stakeAmountDollarTarget * 1e18) / _priceStakingToken;
         stakingTokenPriceQueryId = _stakingTokenPriceQueryId;
     }
 
@@ -276,10 +276,10 @@ contract TellorFlex {
             "nonce must match timestamp index"
         );
         StakeInfo storage _staker = stakerDetails[msg.sender];
-        require(
-            _staker.stakedBalance >= stakeAmount,
-            "balance must be greater than stake amount"
-        );
+        // require(
+        //     _staker.stakedBalance >= stakeAmount,
+        //     "balance must be greater than stake amount"
+        // );
         // Require reporter to abide by given reporting lock
         require(
             (block.timestamp - _staker.reporterLastTimestamp) * 1000 >
@@ -288,7 +288,7 @@ contract TellorFlex {
         );
         require(
             _queryId == keccak256(_queryData) || uint256(_queryId) <= 100,
-            "id must be hash of bytes data"
+            "query id must be hash of query data"
         );
         _staker.reporterLastTimestamp = block.timestamp;
         // Checks for no double reporting of timestamps
@@ -328,6 +328,10 @@ contract TellorFlex {
         );
     }
 
+    /**
+     * @dev Updates the stake amount after retrieving the latest
+     * 12+ hour staking token price from the oracle
+     */
     function updateStakeAmount() external {
         (bool _valFound, bytes memory _val, ) = getDataBefore(
             stakingTokenPriceQueryId,
@@ -344,6 +348,9 @@ contract TellorFlex {
         }
     }
 
+    /**
+     * @dev Updates the time based rewards balance
+     */
     function updateTotalTimeBasedRewardsBalance() external {
         totalTimeBasedRewardsBalance =
             token.balanceOf(address(this)) -
@@ -351,7 +358,7 @@ contract TellorFlex {
     }
 
     /**
-     * @dev Withdraws a reporter's stake
+     * @dev Withdraws a reporter's stake after the lock period expires
      */
     function withdrawStake() external {
         StakeInfo storage _staker = stakerDetails[msg.sender];
@@ -584,6 +591,7 @@ contract TellorFlex {
      * @return uint total number of reports submitted by reporter
      * @return uint governance vote count when first staked
      * @return uint number of votes cast by staker when first staked
+     * @return bool whether staker is counted in totalStakers 
      */
     function getStakerInfo(address _stakerAddress)
         external
@@ -596,7 +604,8 @@ contract TellorFlex {
             uint256,
             uint256,
             uint256,
-            uint256
+            uint256,
+            bool
         )
     {
         StakeInfo storage _staker = stakerDetails[_stakerAddress];
@@ -608,7 +617,8 @@ contract TellorFlex {
             _staker.reporterLastTimestamp,
             _staker.reportsSubmitted,
             _staker.startVoteCount,
-            _staker.startVoteTally
+            _staker.startVoteTally,
+            _staker.staked
         );
     }
 
@@ -803,6 +813,8 @@ contract TellorFlex {
      * @dev Called whenever a user's stake amount changes. First updates staking rewards,
      * transfers pending rewards to user's address, and finally updates user's stake amount
      * and other relevant variables.
+     * @param _stakerAddress address of user whose stake is being updated
+     * @param _newStakedBalance new staked balance of user
      */
     function _updateStakeAndPayRewards(
         address _stakerAddress,
@@ -811,6 +823,7 @@ contract TellorFlex {
         _updateRewards();
         StakeInfo storage _staker = stakerDetails[_stakerAddress];
         if (_staker.stakedBalance > 0) {
+            // if address already has a staked balance, calculate and transfer pending rewards
             uint256 _pendingReward = (_staker.stakedBalance *
                 accumulatedRewardPerShare) /
                 1e18 -

@@ -32,7 +32,8 @@ describe("TellorFlex e2e Tests", function () {
         reporterLastTimestamp: 4,
         reportsSubmitted: 5,
         startVoteCount: 6,
-        startVoteTally: 7
+        startVoteTally: 7,
+        staked: 8
     } // getStakerInfo() indices
 
     beforeEach(async function () {
@@ -516,5 +517,27 @@ describe("TellorFlex e2e Tests", function () {
         await tellor.updateStakeAmount()
         expectedStakeAmount = BigInt(STAKE_AMOUNT_USD_TARGET) * BigInt(1e18) / BigInt(lowPrice);
         expect(await tellor.stakeAmount()).to.equal(expectedStakeAmount)
+    })
+
+    it("stake deposits round down when divided into multiple stakes (ex. 21 -> 2)", async function() {
+        // Setup
+        await token.mint(accounts[1].address, h.toWei("30"))
+        await token.approve(tellor.address, h.toWei("30"))
+        await tellor.connect(accounts[1]).depositStake(h.toWei("9"))
+
+        // ensure can't submit value with less than one stake
+        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x'))
+
+        // stake a single stake amount
+        await tellor.connect(accounts[1]).depositStake(h.toWei("1"))
+        tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x')
+
+        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x'))
+        await tellor.connect(accounts[1]).depositStake(h.toWei("9"))
+        await h.advanceTime(60 * 60 * 6)
+
+        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x'))
+        await tellor.connect(accounts[1]).depositStake(h.toWei("1"))
+        tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x')
     })
 })

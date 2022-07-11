@@ -31,7 +31,8 @@ describe("TellorFlex Function Tests", function () {
 		reporterLastTimestamp: 4,
 		reportsSubmitted: 5,
 		startVoteCount: 6,
-		startVoteTally: 7
+		startVoteTally: 7,
+        staked: 8
 	} // getStakerInfo() indices
 
 	beforeEach(async function () {
@@ -96,6 +97,7 @@ describe("TellorFlex Function Tests", function () {
 		expect(stakerDetails[smap.reportsSubmitted]).to.equal(0) // reportsSubmitted
 		expect(stakerDetails[smap.startVoteCount]).to.equal(0) // startVoteCount
 		expect(stakerDetails[smap.startVoteTally]).to.equal(0) // startVoteTally
+		expect(stakerDetails[smap.staked]).to.equal(true) // staked
 		expect(await tellor.totalRewardDebt()).to.equal(0)
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("10"))
 
@@ -146,6 +148,7 @@ describe("TellorFlex Function Tests", function () {
 		expect(stakerDetails[smap.startDate]).to.equal(blocky.timestamp)
 		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("100"))
 		expect(stakerDetails[smap.lockedBalance]).to.equal(0)
+		expect(stakerDetails[smap.staked]).to.equal(true)
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("100"))
 		expect(await tellor.totalRewardDebt()).to.equal(0)
 		await h.expectThrow(tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("101"))) // test require: insufficient staked balance
@@ -157,6 +160,7 @@ describe("TellorFlex Function Tests", function () {
 		expect(stakerDetails[smap.rewardDebt]).to.equal(0)
 		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("90"))
 		expect(stakerDetails[smap.lockedBalance]).to.equal(web3.utils.toWei("10"))
+		expect(stakerDetails[smap.staked]).to.equal(true)
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("90"))
 		expect(await tellor.totalRewardDebt()).to.equal(0)
 
@@ -169,6 +173,7 @@ describe("TellorFlex Function Tests", function () {
 		expect(stakerDetails[smap.rewardDebt]).to.equal(0)
 		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("90"))
 		expect(stakerDetails[smap.lockedBalance]).to.equal(web3.utils.toWei("10"))
+		expect(stakerDetails[smap.staked]).to.equal(true)
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("90"))
 		expect(await tellor.totalRewardDebt()).to.equal(0)
 
@@ -197,6 +202,7 @@ describe("TellorFlex Function Tests", function () {
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
 		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("90"))
 		expect(stakerDetails[smap.lockedBalance]).to.equal(0)
+		expect(stakerDetails[smap.staked]).to.equal(true)
 		expect(await tellor.totalStakers()).to.equal(1) // Still one staker bc account#1 has 90 staked & stake amount is 10
 		expect(await token.balanceOf(accounts[2].address)).to.equal(web3.utils.toWei("10"))
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("90"))
