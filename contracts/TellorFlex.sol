@@ -76,9 +76,8 @@ contract TellorFlex {
         address _reporter,
         address _recipient,
         uint256 _slashAmount
-    );
+    );event StakeWithdrawn(address _staker);
     event StakeWithdrawRequested(address _staker, uint256 _amount);
-    event StakeWithdrawn(address _staker);
     event ValueRemoved(bytes32 _queryId, uint256 _timestamp);
 
     // Functions
@@ -116,6 +115,10 @@ contract TellorFlex {
         governance = _governanceAddress;
     }
 
+    /**
+     * @dev Allows any address to add staking rewards
+     * @param _amount amount of tokens to add to the staking rewards balance
+     */
     function addStakingRewards(uint256 _amount) external {
         require(token.transferFrom(msg.sender, address(this), _amount));
         _updateRewards();
@@ -134,31 +137,36 @@ contract TellorFlex {
      */
     function depositStake(uint256 _amount) external {
         StakeInfo storage _staker = stakerDetails[msg.sender];
-        if (_staker.lockedBalance > 0) {
-            if (_staker.lockedBalance >= _amount) {
+        uint256 _stakedBalance = _staker.stakedBalance;
+        uint256 _lockedBalance = _staker.lockedBalance;
+        if (_lockedBalance > 0) {
+            if (_lockedBalance >= _amount) {
                 // if staker's locked balance covers full _amount, use that
                 _staker.lockedBalance -= _amount;
             } else {
+                // otherwise, stake the whole locked balance and transfer the
+                // remaining amount from the staker's address
                 require(
                     token.transferFrom(
                         msg.sender,
                         address(this),
-                        _amount - _staker.lockedBalance
+                        _amount - _lockedBalance
                     )
                 );
                 _staker.lockedBalance = 0;
             }
         } else {
-            if (_staker.stakedBalance == 0) {
+            if (_stakedBalance == 0) {
+                // if staked balance and locked balance equal 0, save current vote tally.
+                // voting participation used for calculating rewards
                 _staker.startVoteCount = IGovernance(governance).getVoteCount();
                 _staker.startVoteTally = IGovernance(governance)
                     .getVoteTallyByAddress(msg.sender);
             }
             require(token.transferFrom(msg.sender, address(this), _amount));
         }
-        _updateStakeAndPayRewards(msg.sender, _staker.stakedBalance + _amount);
+        _updateStakeAndPayRewards(msg.sender, _stakedBalance + _amount);
         _staker.startDate = block.timestamp; // This resets the staker start date to now
-
         emit NewStaker(msg.sender, _amount);
     }
 
@@ -215,25 +223,32 @@ contract TellorFlex {
     {
         require(msg.sender == governance, "only governance can slash reporter");
         StakeInfo storage _staker = stakerDetails[_reporter];
+        uint256 _stakedBalance = _staker.stakedBalance;
+        uint256 _lockedBalance = _staker.lockedBalance;
         require(
-            _staker.stakedBalance + _staker.lockedBalance > 0,
+            _stakedBalance + _lockedBalance > 0,
             "zero staker balance"
         );
         uint256 _slashAmount;
-        if (_staker.lockedBalance >= stakeAmount) {
+        if (_lockedBalance >= stakeAmount) {
+            // if locked balance is at least stakeAmount, slash from locked balance
             _slashAmount = stakeAmount;
             _staker.lockedBalance -= stakeAmount;
         } else if (
-            _staker.lockedBalance + _staker.stakedBalance >= stakeAmount
+            _lockedBalance + _stakedBalance >= stakeAmount
         ) {
+            // if locked balance + staked balance is at least stakeAmount,
+            // slash from locked balance and slash remainder from staked balance
             _slashAmount = stakeAmount;
             _updateStakeAndPayRewards(
                 _reporter,
-                _staker.stakedBalance - (stakeAmount - _staker.lockedBalance)
+                _stakedBalance - (stakeAmount - _lockedBalance)
             );
             _staker.lockedBalance = 0;
         } else {
-            _slashAmount = _staker.stakedBalance + _staker.lockedBalance;
+            // if sum(locked balance + staked balance) is less than stakeAmount,
+            // slash sum
+            _slashAmount = _stakedBalance + _lockedBalance;
             _updateStakeAndPayRewards(_reporter, 0);
             _staker.lockedBalance = 0;
         }
