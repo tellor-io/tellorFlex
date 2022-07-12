@@ -42,6 +42,7 @@ contract TellorFlex {
         mapping(uint256 => uint256) timestampToBlockNum; // mapping of timestamp to block number
         mapping(uint256 => bytes) valueByTimestamp; // mapping of timestamps to values
         mapping(uint256 => address) reporterByTimestamp; // mapping of timestamps to reporters
+        mapping(uint256 => bool) isDisputed;
     }
 
     struct StakeInfo {
@@ -104,8 +105,8 @@ contract TellorFlex {
     }
 
     /**
-     * @dev Sets governance address, only callable by owner one time
-     * @param _governanceAddress address of governance contract
+     * @dev Allows the owner to initialize the governance (flex addy needed for governance deployment)
+     * @param _governanceAddress address of governance contract (github.com/tellor-io/governance)
      */
     function init(address _governanceAddress) external {
         require(msg.sender == owner, "only owner can set governance address");
@@ -118,8 +119,8 @@ contract TellorFlex {
     }
 
     /**
-     * @dev Allows any address to add staking rewards
-     * @param _amount amount of tokens to add to the staking rewards balance
+     * @dev Funds the Flex contract with staking rewards (paid by autopay and minting)
+     * @param _amount amount of tokens to fund contract with
      */
     function addStakingRewards(uint256 _amount) external {
         require(token.transferFrom(msg.sender, address(this), _amount));
@@ -184,16 +185,8 @@ contract TellorFlex {
         Report storage _report = reports[_queryId];
         uint256 _index = _report.timestampIndex[_timestamp];
         require(_timestamp == _report.timestamps[_index], "invalid timestamp");
-        // Shift all timestamps back to reflect deletion of value
-        for (uint256 _i = _index; _i < _report.timestamps.length - 1; _i++) {
-            _report.timestamps[_i] = _report.timestamps[_i + 1];
-            _report.timestampIndex[_report.timestamps[_i]] -= 1;
-        }
-        // Delete and reset timestamp and value
-        delete _report.timestamps[_report.timestamps.length - 1];
-        _report.timestamps.pop();
         _report.valueByTimestamp[_timestamp] = "";
-        _report.timestampIndex[_timestamp] = 0;
+        _report.isDisputed[_timestamp] = true;
         emit ValueRemoved(_queryId, _timestamp);
     }
 
@@ -218,11 +211,11 @@ contract TellorFlex {
      * Note: this function is only callable by the governance address.
      * @param _reporter is the address of the reporter being slashed
      * @param _recipient is the address receiving the reporter's stake
-     * @return uint256 amount of token slashed and sent to recipient address
+     * @return _slashAmount uint256 amount of token slashed and sent to recipient address
      */
     function slashReporter(address _reporter, address _recipient)
         external
-        returns (uint256)
+        returns (uint256 _slashAmount)
     {
         require(msg.sender == governance, "only governance can slash reporter");
         StakeInfo storage _staker = stakerDetails[_reporter];
@@ -250,9 +243,8 @@ contract TellorFlex {
             _updateStakeAndPayRewards(_reporter, 0);
             _staker.lockedBalance = 0;
         }
-        token.transfer(_recipient, _slashAmount);
+        require(token.transfer(_recipient, _slashAmount));
         emit ReporterSlashed(_reporter, _recipient, _slashAmount);
-        return (_slashAmount);
     }
 
     /**
@@ -303,13 +295,14 @@ contract TellorFlex {
         // Disperse Time Based Reward
         uint256 _timeDiff = block.timestamp - timeOfLastNewValue;
         uint256 _reward = (_timeDiff * timeBasedReward) / 300; //.5 TRB per 5 minutes
-        if (_reward > 0 && totalTimeBasedRewardsBalance > 0) {
-            if (totalTimeBasedRewardsBalance < _reward) {
-                token.transfer(msg.sender, totalTimeBasedRewardsBalance);
-                totalTimeBasedRewardsBalance = 0;
+        uint256 _totalTimeBasedRewardsBalance =
+            token.balanceOf(address(this)) -
+            (totalStakeAmount + stakingRewardsBalance);
+        if (_reward > 0 && _totalTimeBasedRewardsBalance > 0) {
+            if (_totalTimeBasedRewardsBalance < _reward) {
+                token.transfer(msg.sender, _totalTimeBasedRewardsBalance);
             } else {
                 token.transfer(msg.sender, _reward);
-                totalTimeBasedRewardsBalance -= _reward;
             }
         }
         // Update last oracle value and number of values submitted by a reporter
@@ -369,7 +362,7 @@ contract TellorFlex {
             _staker.lockedBalance > 0,
             "reporter not locked for withdrawal"
         );
-        token.transfer(msg.sender, _staker.lockedBalance);
+        require(token.transfer(msg.sender, _staker.lockedBalance));
         _staker.lockedBalance = 0;
         emit StakeWithdrawn(msg.sender);
     }
@@ -402,14 +395,9 @@ contract TellorFlex {
     function getCurrentValue(bytes32 _queryId)
         external
         view
-        returns (bytes memory)
+        returns (bytes memory _value)
     {
-        return
-            reports[_queryId].valueByTimestamp[
-                reports[_queryId].timestamps[
-                    reports[_queryId].timestamps.length - 1
-                ]
-            ];
+        (,_value,) = getDataBefore(_queryId, block.timestamp);
     }
 
     /**
@@ -436,9 +424,17 @@ contract TellorFlex {
         if (!_found) return (false, bytes(""), 0);
         uint256 _time = getTimestampbyQueryIdandIndex(_queryId, _index);
         _value = retrieveData(_queryId, _time);
-        if (keccak256(_value) != keccak256(bytes("")))
-            return (true, _value, _time);
-        return (false, bytes(""), 0);
+        if (_report.isDisputed[_time]){
+            for(uint256 _i = _index - 1; _i > 0; _i-- ){
+                _time = getTimestampbyQueryIdandIndex(_queryId, _index - _i);
+                _value = retrieveData(_queryId, _time);
+                if(!_report.isDisputed[_time])){
+                    return (true, _value, _time);
+                }
+            }
+            return (false, bytes(""), 0);
+        }
+        return (true, _value, _time);
     }
 
     /**
@@ -668,51 +664,85 @@ contract TellorFlex {
         returns (bool _found, uint256 _index)
     {
         uint256 _count = getNewValueCountbyQueryId(_queryId);
-
         if (_count > 0) {
-            uint256 middle;
-            uint256 start = 0;
-            uint256 end = _count - 1;
+            uint256 _middle;
+            uint256 _start = 0;
+            uint256 _end = _count - 1;
             uint256 _time;
-
             //Checking Boundaries to short-circuit the algorithm
-            _time = getTimestampbyQueryIdandIndex(_queryId, start);
+            _time = getTimestampbyQueryIdandIndex(_queryId, _start);
             if (_time >= _timestamp) return (false, 0);
-            _time = getTimestampbyQueryIdandIndex(_queryId, end);
-            if (_time < _timestamp) return (true, end);
-
+            _time = getTimestampbyQueryIdandIndex(_queryId, _end);
+            if (_time < _timestamp) {
+                while(isInDispute(_queryId, _time) && _end > 0) {
+                    _end--;
+                    _time = getTimestampbyQueryIdandIndex(_queryId, _end);
+                }
+                if(_end == 0 && isInDispute(_queryId, _time)) {
+                    return (false, 0);
+                }
+                return (true, _end);
+            }
             //Since the value is within our boundaries, do a binary search
             while (true) {
-                middle = (end - start) / 2 + 1 + start;
-                _time = getTimestampbyQueryIdandIndex(_queryId, middle);
+                _middle = (_end - _start) / 2 + 1 + _start;
+                _time = getTimestampbyQueryIdandIndex(_queryId, _middle);
                 if (_time < _timestamp) {
                     //get immediate next value
                     uint256 _nextTime = getTimestampbyQueryIdandIndex(
                         _queryId,
-                        middle + 1
+                        _middle + 1
                     );
                     if (_nextTime >= _timestamp) {
-                        //_time is correct
-                        return (true, middle);
+                        if(!isInDispute(_queryId, _time)) {
+                            // _time is correct
+                            return (true, _middle);
+                        } else {
+                            // iterate backwards until we find a non-disputed value
+                            while(isInDispute(_queryId, _time) && _middle > 0) {
+                                _middle--;
+                                _time = getTimestampbyQueryIdandIndex(_queryId, _middle);
+                            }
+                            if(_middle == 0 && isInDispute(_queryId, _time)) {
+                                return (false, 0);
+                            }
+                            // _time is correct
+                            return (true, _middle);
+                        }
                     } else {
                         //look from middle + 1(next value) to end
-                        start = middle + 1;
+                        _start = _middle + 1;
                     }
                 } else {
                     uint256 _prevTime = getTimestampbyQueryIdandIndex(
                         _queryId,
-                        middle - 1
+                        _middle - 1
                     );
                     if (_prevTime < _timestamp) {
-                        // _prevtime is correct
-                        return (true, middle - 1);
+                        if(!isInDispute(_queryId, _prevTime)) {
+                            // _prevTime is correct
+                            return (true, _middle - 1);
+                        } else {
+                            // iterate backwards until we find a non-disputed value
+                            middle--;
+                            while(isInDispute(_queryId, _prevTime) && _middle > 0) {
+                                _middle--;
+                                _prevTime = getTimestampbyQueryIdandIndex(
+                                    _queryId,
+                                    _middle
+                                );
+                            }
+                            if(_middle == 0 && isInDispute(_queryId, _prevTime)) {
+                                return (false, 0);
+                            }
+                            // _prevtime is correct
+                            return (true, _middle - 1);
+                        }
                     } else {
                         //look from start to middle -1(prev value)
-                        end = middle - 1;
+                        _end = _middle - 1;
                     }
                 }
-                //We couldn't find a value
-                //if(middle - 1 == start || middle == _count) return (false, 0);
             }
         }
         return (false, 0);
@@ -754,6 +784,14 @@ contract TellorFlex {
      */
     function getTotalStakers() external view returns (uint256) {
         return totalStakers;
+    }
+
+    /**
+     * @dev Returns total balance of time based rewards in contract
+     * @return uint256 amount of trb
+     */
+    function getTotalTimeBasedRewardsBalance() external view returns (uint256) {
+        return token.balanceOf(address(this)) - (totalStakeAmount + stakingRewardsBalance);
     }
 
     /**
@@ -860,7 +898,7 @@ contract TellorFlex {
                     _numberOfVotes;
             }
             stakingRewardsBalance -= _pendingReward;
-            token.transfer(msg.sender, _pendingReward);
+            require(token.transfer(msg.sender, _pendingReward));
             totalRewardDebt -= _staker.rewardDebt;
             totalStakeAmount -= _staker.stakedBalance;
         }
