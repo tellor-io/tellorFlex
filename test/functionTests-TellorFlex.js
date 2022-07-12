@@ -927,7 +927,26 @@ describe("TellorFlex Function Tests", function () {
         expect(await tellor.stakingRewardsBalance()).to.equal(BN(h.toWei("1000")).sub(expectedBalance).add(h.toWei("990")))
     })
 
-
-
+	it("getRealStakingRewardsBalance", async function () {
+		expect(await tellor.getRealStakingRewardsBalance()).to.equal(0)
+		await token.mint(accounts[0].address, web3.utils.toWei("1000"))
+		await token.approve(tellor.address, web3.utils.toWei("1000"))
+		// add staking rewards
+		await tellor.addStakingRewards(web3.utils.toWei("1000"))
+		expectedRewardRate = Math.floor(h.toWei("1000") / REWARD_RATE_TARGET)
+		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
+		blocky0 = await h.getBlock()
+		// advance time
+		await h.advanceTime(86400 * 10)
+		pendingReward = await tellor.getPendingRewardByStaker(accounts[1].address)
+		blocky1 = await h.getBlock()
+		expectedAccumulatedRewardPerShare = BN(blocky1.timestamp - blocky0.timestamp).mul(expectedRewardRate).div(10)
+		expectedPendingReward = BN(h.toWei("10")).mul(expectedAccumulatedRewardPerShare).div(h.toWei("1"))
+		expectedRealStakingRewardsBalance = BigInt(h.toWei("1000")) - BigInt(expectedPendingReward)
+		expect(await tellor.getRealStakingRewardsBalance()).to.equal(expectedRealStakingRewardsBalance)
+		await h.advanceTime(86400 * 30)
+		expect(await tellor.getRealStakingRewardsBalance()).to.equal(0)
+		expect(await tellor.stakingRewardsBalance()).to.equal(h.toWei("1000"))
+	})
 
 });

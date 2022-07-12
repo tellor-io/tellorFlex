@@ -49,7 +49,7 @@ contract TellorFlex {
         uint256 startDate; // stake or withdrawal request start date
         uint256 stakedBalance; // staked token balance
         uint256 lockedBalance; // amount locked for withdrawal
-        uint256 rewardDebt; // used for reward calculation
+        uint256 rewardDebt; // used for staking reward calculation
         uint256 reporterLastTimestamp; // timestamp of reporter's last reported value
         uint256 reportsSubmitted; // total number of reports submitted by reporter
         uint256 startVoteCount; // total number of governance votes when stake deposited
@@ -61,18 +61,17 @@ contract TellorFlex {
     // Events
     event NewGovernanceAddress(address _newGovernanceAddress);
     event NewReport(
-        bytes32 _queryId,
+        bytes32 indexed _queryId,
         uint256 _time,
         bytes _value,
         uint256 _nonce,
-        bytes _queryData,
-        address _reporter
+        bytes indexed _queryData,
+        address indexed _reporter
     );
-    event NewReportingLock(uint256 _newReportingLock);
     event NewStakeAmount(uint256 _newStakeAmount);
-    event NewStaker(address _staker, uint256 _amount);
+    event NewStaker(address indexed _staker, uint256 indexed _amount);
     event ReporterSlashed(
-        address _reporter,
+        address indexed _reporter,
         address _recipient,
         uint256 _slashAmount
     );
@@ -123,6 +122,7 @@ contract TellorFlex {
         require(token.transferFrom(msg.sender, address(this), _amount));
         _updateRewards();
         stakingRewardsBalance += _amount;
+        // update reward rate = real staking rewards balance / 30 days
         rewardRate =
             (stakingRewardsBalance -
                 ((accumulatedRewardPerShare * totalStakeAmount) /
@@ -330,7 +330,7 @@ contract TellorFlex {
 
     /**
      * @dev Updates the stake amount after retrieving the latest
-     * 12+ hour staking token price from the oracle
+     * 12+-hour-old staking token price from the oracle
      */
     function updateStakeAmount() external {
         (bool _valFound, bytes memory _val, ) = getDataBefore(
@@ -490,6 +490,15 @@ contract TellorFlex {
                 _numberOfVotes;
         }
         return _pendingReward;
+    }
+
+    /**
+     * @dev Returns the real staking rewards balance after accounting for unclaimed rewards
+     * @return uint256 real staking rewards balance
+     */
+    function getRealStakingRewardsBalance() external view returns(uint256) {
+        uint256 _pendingRewards = _getUpdatedAccumulatedRewardPerShare() * totalStakeAmount / 1e18 - totalRewardDebt;
+        return (stakingRewardsBalance - _pendingRewards);
     }
 
     /**
@@ -886,7 +895,7 @@ contract TellorFlex {
             return accumulatedRewardPerShare;
         }
         uint256 _newAccumulatedRewardPerShare = accumulatedRewardPerShare +
-            ((block.timestamp - timeOfLastAllocation) * rewardRate * 1e18) /
+            (block.timestamp - timeOfLastAllocation) * rewardRate * 1e18 /
             totalStakeAmount;
         uint256 _accumulatedReward = (_newAccumulatedRewardPerShare *
             totalStakeAmount) /
@@ -904,4 +913,6 @@ contract TellorFlex {
         }
         return _newAccumulatedRewardPerShare;
     }
+
+    
 }
