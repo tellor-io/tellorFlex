@@ -509,11 +509,9 @@ describe("TellorFlex Function Tests", function () {
 	})
 
 	it("updateTotalTimeBasedRewardsBalance", async function () {
-		expect(BN(await tellor.totalTimeBasedRewardsBalance())).to.equal(0)
+		expect(BN(await tellor.getTotalTimeBasedRewardsBalance())).to.equal(0)
 		await token.connect(accounts[1]).transfer(tellor.address, web3.utils.toWei("100"))
-		expect(BN(await tellor.totalTimeBasedRewardsBalance())).to.equal(0)
-		await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
-		expect(BN(await tellor.totalTimeBasedRewardsBalance())).to.equal(web3.utils.toWei("100"))
+		expect(BN(await tellor.getTotalTimeBasedRewardsBalance())).to.equal(web3.utils.toWei("100"))
 	})
 
 	it("addStakingRewards", async function () {
