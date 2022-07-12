@@ -126,10 +126,12 @@ describe("TellorFlex - Function Tests", function () {
 		await h.expectThrow(tellor.connect(govSigner).removeValue(QUERYID1, 500)) // invalid value
 		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.bytes(100))
 		await h.expectThrow(tellor.connect(accounts[1]).removeValue(QUERYID1, blocky.timestamp)) // test require: only gov can removeValue
+		expect(await tellor.isInDispute(QUERYID1, blocky.timestamp)).to.be.false
 		await tellor.connect(govSigner).removeValue(QUERYID1, blocky.timestamp)
-		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(0)
+		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(1)
 		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal("0x")
-		await h.expectThrow(tellor.connect(govSigner).removeValue(QUERYID1, blocky.timestamp)) // test require: invalid timestamp
+		expect(await tellor.isInDispute(QUERYID1, blocky.timestamp)).to.be.true
+		await h.expectThrow(tellor.connect(govSigner).removeValue(QUERYID1, blocky.timestamp)) // test require: value already disputed
 
 		// Test min/max values for _timestamp argument
 		await h.advanceTime(60 * 60 * 12)
@@ -577,36 +579,104 @@ describe("TellorFlex - Function Tests", function () {
 		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("1000"))
 
 		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100), 0, '0x')
+		blocky0 = await h.getBlock()
 		await h.advanceTime(60 * 60 * 12)
 		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100), 1, '0x')
+		blocky1 = await h.getBlock()
 		await h.advanceTime(60 * 60 * 12)
 		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100), 2, '0x')
-
-		blocky3 = await h.getBlock()
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky3.timestamp)
+		blocky2 = await h.getBlock()
+		
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
 
 		// advance time one year and test
 		await h.advanceTime(86400 * 365)
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky3.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
 
 		// advance time one year and test
 		await h.advanceTime(86400 * 365)
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky3.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
 
 		for(i = 0; i < 50; i++) {
-			await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100 + i), 0, '0x')
 			await h.advanceTime(60 * 60 * 12)
+			await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100 + i), 0, '0x')
 		}
+		blocky52 = await h.getBlock()
+		
+		// test last value disputed
+		await tellor.connect(govSigner).removeValue(QUERYID2, blocky52.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky52.timestamp + 1)
+		expect(index[0]).to.be.true
+		expect(index[1]).to.equal(51)
 
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky3.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
+
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp + 1)
+		expect(index[0]).to.be.true
+		expect(index[1]).to.equal(2)
+
+		// remove value at index 2
+		await tellor.connect(govSigner).removeValue(QUERYID2, blocky2.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp)
+		expect(index[0]).to.be.true
+		expect(index[1]).to.equal(1)
+
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp + 1)
+		expect(index[0]).to.be.true
+		expect(index[1]).to.equal(1)
+
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky1.timestamp + 1)
+		expect(index[0]).to.be.true
+		expect(index[1]).to.equal(1)
+
+		await tellor.connect(govSigner).removeValue(QUERYID2, blocky1.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp - 1)
+		expect(index[0]).to.be.true
+		expect(index[1]).to.equal(0)
+
+		await tellor.connect(govSigner).removeValue(QUERYID2, blocky0.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp - 1)
+		expect(index[0]).to.be.false
+		expect(index[1]).to.equal(0)
+
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+		blocky0 = await h.getBlock()
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+		blocky1 = await h.getBlock()
+
+		await tellor.connect(govSigner).removeValue(QUERYID1, blocky0.timestamp)
+		await tellor.connect(govSigner).removeValue(QUERYID1, blocky1.timestamp)
+
+		index = await tellor.getIndexForDataBefore(QUERYID1, blocky1.timestamp + 1)
+		expect(index[0]).to.be.false
+		expect(index[1]).to.equal(0)
+
+		index = await tellor.getIndexForDataBefore(QUERYID1, blocky0.timestamp + 1)
+		expect(index[0]).to.be.false
+		expect(index[1]).to.equal(0)
+
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+		blocky2 = await h.getBlock()
+
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+		// blocky3 = await h.getBlock()
+
+		await tellor.connect(govSigner).removeValue(QUERYID1, blocky2.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID1, blocky2.timestamp + 1)
+		expect(index[0]).to.be.false
+		expect(index[1]).to.equal(0)
 	})
 
 	it("getDataBefore()", async function () {

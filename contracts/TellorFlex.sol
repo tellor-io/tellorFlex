@@ -3,6 +3,7 @@ pragma solidity 0.8.3;
 
 import "./interfaces/IERC20.sol";
 import "./interfaces/IGovernance.sol";
+import "hardhat/console.sol";
 
 /**
  @author Tellor Inc.
@@ -183,6 +184,7 @@ contract TellorFlex {
     function removeValue(bytes32 _queryId, uint256 _timestamp) external {
         require(msg.sender == governance, "caller must be governance address");
         Report storage _report = reports[_queryId];
+        require(!_report.isDisputed[_timestamp], "value already disputed");
         uint256 _index = _report.timestampIndex[_timestamp];
         require(_timestamp == _report.timestamps[_index], "invalid timestamp");
         _report.valueByTimestamp[_timestamp] = "";
@@ -390,14 +392,14 @@ contract TellorFlex {
     /**
      * @dev Returns the current value of a data feed given a specific ID
      * @param _queryId is the ID of the specific data feed
-     * @return bytes the latest submitted value for the given queryId
+     * @return _value the latest submitted value for the given queryId
      */
     function getCurrentValue(bytes32 _queryId)
         external
         view
         returns (bytes memory _value)
     {
-        (,_value,) = getDataBefore(_queryId, block.timestamp);
+        (,_value,) = getDataBefore(_queryId, block.timestamp + 1);
     }
 
     /**
@@ -424,17 +426,9 @@ contract TellorFlex {
         if (!_found) return (false, bytes(""), 0);
         uint256 _time = getTimestampbyQueryIdandIndex(_queryId, _index);
         _value = retrieveData(_queryId, _time);
-        if (_report.isDisputed[_time]){
-            for(uint256 _i = _index - 1; _i > 0; _i-- ){
-                _time = getTimestampbyQueryIdandIndex(_queryId, _index - _i);
-                _value = retrieveData(_queryId, _time);
-                if(!_report.isDisputed[_time])){
-                    return (true, _value, _time);
-                }
-            }
-            return (false, bytes(""), 0);
-        }
-        return (true, _value, _time);
+        if (keccak256(_value) != keccak256(bytes("")))
+            return (true, _value, _time);
+        return (false, bytes(""), 0);
     }
 
     /**
@@ -510,10 +504,7 @@ contract TellorFlex {
         view
         returns (address, bool)
     {
-        bool _wasRemoved = reports[_queryId].timestampIndex[_timestamp] == 0 &&
-            keccak256(reports[_queryId].valueByTimestamp[_timestamp]) ==
-            keccak256(bytes("")) &&
-            reports[_queryId].reporterByTimestamp[_timestamp] != address(0);
+        bool _wasRemoved = reports[_queryId].isDisputed[_timestamp];
         return (reports[_queryId].reporterByTimestamp[_timestamp], _wasRemoved);
     }
 
@@ -724,7 +715,7 @@ contract TellorFlex {
                             return (true, _middle - 1);
                         } else {
                             // iterate backwards until we find a non-disputed value
-                            middle--;
+                            _middle--;
                             while(isInDispute(_queryId, _prevTime) && _middle > 0) {
                                 _middle--;
                                 _prevTime = getTimestampbyQueryIdandIndex(
@@ -736,7 +727,7 @@ contract TellorFlex {
                                 return (false, 0);
                             }
                             // _prevtime is correct
-                            return (true, _middle - 1);
+                            return (true, _middle);
                         }
                     } else {
                         //look from start to middle -1(prev value)
@@ -792,6 +783,20 @@ contract TellorFlex {
      */
     function getTotalTimeBasedRewardsBalance() external view returns (uint256) {
         return token.balanceOf(address(this)) - (totalStakeAmount + stakingRewardsBalance);
+    }
+
+    /**
+     * @dev Returns whether a given value is disputed
+     * @param _queryId unique ID of the data feed
+     * @param _timestamp timestamp of the value
+     * @return bool whether the value is disputed
+     */
+    function isInDispute(bytes32 _queryId, uint256 _timestamp)
+        public
+        view
+        returns (bool)
+    {
+        return reports[_queryId].isDisputed[_timestamp];
     }
 
     /**

@@ -366,35 +366,38 @@ describe("TellorFlex - e2e Tests", function () {
 
     it("TBR + stakes + staking rewards == balanceOf(flexAddress)", async function () {
         // Setup
-        await token.mint(accounts[1].address, web3.utils.toWei("1000"));
-        await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
-
+        await token.mint(accounts[1].address, web3.utils.toWei("200"));
+        await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("200"))
         // Check balance after adding time-based rewards, stake, & staking rewards
         await token.mint(tellor.address, web3.utils.toWei("100")) // add tb rewards
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("100"))
         await tellor.connect(accounts[1]).addStakingRewards(web3.utils.toWei("100"))
+        await token.connect(accounts[1]).transfer(accounts[10].address, await token.balanceOf(accounts[1].address))
         tellorBalance1 = await token.balanceOf(tellor.address)
-        expect(tellorBalance1).to.equal(web3.utils.toWei("300"))
+        expect(BigInt(tellorBalance1)).to.equal(BigInt(web3.utils.toWei("300")))
 
         // Reduce time-based rewards & check updated balance
         await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(420), 0, TRB_QUERY_DATA)
         let tbr = await tellor.getTotalTimeBasedRewardsBalance()
         rewardsGiven = web3.utils.toWei("100") - tbr
         tellorBalance2 = (await token.balanceOf(tellor.address))*1 + 1*rewardsGiven
-        expect(tellorBalance2).to.equal(web3.utils.toWei("300"))
+        expect(BigInt(tellorBalance2)).to.equal(BigInt(web3.utils.toWei("300")))
 
         // Check balance after reducing stakes & staking rewards
-        stakingRewards1 = await tellor.stakingRewardsBalance()
-        totalStakes1 = await tellor.totalStakeAmount()
         await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("10"))
         h.advanceTime(60 * 60 * 24 * 7) // 7 days
         await tellor.connect(accounts[1]).withdrawStake()
-        stakingRewards2 = await tellor.stakingRewardsBalance()
-        totalStakes2 = await tellor.totalStakeAmount()
-        tellorBalance3 = await token.balanceOf(tellor.address)
-        totalLoss = (stakingRewards1 - stakingRewards2) + (totalStakes1 - totalStakes2)
-        balanceDiff = tellorBalance2 - tellorBalance3
-        expect(balanceDiff).to.equal(totalLoss)
+        stakingRewards = await tellor.stakingRewardsBalance()
+        totalStakes = await tellor.totalStakeAmount()
+        tbr = await tellor.getTotalTimeBasedRewardsBalance()
+        sum = BigInt(stakingRewards) + BigInt(totalStakes) + BigInt(tbr)
+        tellorBalance = await token.balanceOf(tellor.address)
+        expect(BigInt(tellorBalance)).to.equal(sum)
+
+        // Check that all funds are accounted for
+        acct1Bal = await token.balanceOf(accounts[1].address)
+        sum = BigInt(acct1Bal) + BigInt(tellorBalance)
+        expect(sum).to.equal(BigInt(web3.utils.toWei("300")))
     })
 
     it("TBR, stakes, and staking rewards reach 0", async function () {
