@@ -42,6 +42,7 @@ contract TellorFlex {
         mapping(uint256 => uint256) timestampToBlockNum; // mapping of timestamp to block number
         mapping(uint256 => bytes) valueByTimestamp; // mapping of timestamps to values
         mapping(uint256 => address) reporterByTimestamp; // mapping of timestamps to reporters
+        mapping(uint256 => bool) isDisputed;
     }
 
     struct StakeInfo {
@@ -177,9 +178,9 @@ contract TellorFlex {
         require(msg.sender == governance, "caller must be governance address");
         Report storage _report = reports[_queryId];
         uint256 _index = _report.timestampIndex[_timestamp];
-        require(keccak256(_report.valueByTimestamp[_timestamp]) !=  keccak256(""), "must be a valid value");
         require(_timestamp == _report.timestamps[_index], "invalid timestamp");
         _report.valueByTimestamp[_timestamp] = "";
+        _report.isDisputed[_timestamp] = true;
         emit ValueRemoved(_queryId, _timestamp);
     }
 
@@ -401,11 +402,11 @@ contract TellorFlex {
         if (!_found) return (false, bytes(""), 0);
         uint256 _time = getTimestampbyQueryIdandIndex(_queryId, _index);
         _value = retrieveData(_queryId, _time);
-        if (keccak256(_value) == keccak256(bytes(""))){
+        if (_report.isDisputed[_time]){
             for(uint256 _i = _index - 1; _i > 0; _i-- ){
                 _time = getTimestampbyQueryIdandIndex(_queryId, _index - _i);
                 _value = retrieveData(_queryId, _time);
-                if(keccak256(_value) != keccak256(bytes(""))){
+                if(!_report.isDisputed[_time])){
                     return (true, _value, _time);
                 }
             }
