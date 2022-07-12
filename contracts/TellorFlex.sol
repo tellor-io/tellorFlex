@@ -274,10 +274,10 @@ contract TellorFlex {
             "nonce must match timestamp index"
         );
         StakeInfo storage _staker = stakerDetails[msg.sender];
-        // require(
-        //     _staker.stakedBalance >= stakeAmount,
-        //     "balance must be greater than stake amount"
-        // );
+        require(
+            _staker.stakedBalance >= stakeAmount,
+            "balance must be greater than stake amount"
+        );
         // Require reporter to abide by given reporting lock
         require(
             (block.timestamp - _staker.reporterLastTimestamp) * 1000 >
