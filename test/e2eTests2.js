@@ -6,7 +6,7 @@ const web3 = require('web3');
 const { prependOnceListener } = require("process");
 const BN = ethers.BigNumber.from
 
-describe("TellorFlex e2e Tests - Two", function() {
+describe("TellorFlex - e2e Tests Two", function() {
 
 	let tellor;
     let governance;

@@ -7,7 +7,7 @@ const { prependOnceListener } = require("process");
 const { stakeAmount } = require("./helpers/helpers");
 const BN = ethers.BigNumber.from
 
-describe("TellorFlex e2e Tests", function () {
+describe("TellorFlex - e2e Tests", function () {
 
     let tellor;
     let governance;
