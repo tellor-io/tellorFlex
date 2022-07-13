@@ -34,6 +34,6 @@ contract GovernanceMock {
     }
 
     fallback() external payable {}
-
+    receive() external payable {}
 
 }

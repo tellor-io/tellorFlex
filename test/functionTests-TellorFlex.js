@@ -545,7 +545,8 @@ describe("TellorFlex - Function Tests", function () {
 	})
 
 	it("getPendingRewardByStaker", async function () {
-		expect(await tellor.getPendingRewardByStaker(accounts[1].address)).to.equal(0)
+		let val = await tellor.callStatic.getPendingRewardByStaker(accounts[1].address)
+		expect(val).to.equal(0)
 		await token.mint(accounts[0].address, web3.utils.toWei("1000"))
 		await token.approve(tellor.address, web3.utils.toWei("1000"))
 		// add staking rewards
@@ -555,7 +556,7 @@ describe("TellorFlex - Function Tests", function () {
 		blocky0 = await h.getBlock()
 		// advance time
 		await h.advanceTime(86400 * 10)
-		pendingReward = await tellor.getPendingRewardByStaker(accounts[1].address)
+		pendingReward = await tellor.callStatic.getPendingRewardByStaker(accounts[1].address)
 		blocky1 = await h.getBlock()
 		expectedAccumulatedRewardPerShare = BN(blocky1.timestamp - blocky0.timestamp).mul(expectedRewardRate).div(10)
 		expectedPendingReward = BN(h.toWei("10")).mul(expectedAccumulatedRewardPerShare).div(h.toWei("1"))
@@ -564,12 +565,12 @@ describe("TellorFlex - Function Tests", function () {
 		await governance.beginDisputeMock()
 		await governance.beginDisputeMock()
 		await governance.connect(accounts[1]).voteMock(1)
-		pendingReward = await tellor.getPendingRewardByStaker(accounts[1].address)
+		pendingReward = await tellor.callStatic.getPendingRewardByStaker(accounts[1].address)
 		blocky2 = await h.getBlock()
 		expectedAccumulatedRewardPerShare = BN(blocky2.timestamp - blocky0.timestamp).mul(expectedRewardRate).div(10)
 		expectedPendingReward = BN(h.toWei("10")).mul(expectedAccumulatedRewardPerShare).div(h.toWei("1")).div(2)
 		expect(pendingReward).to.equal(expectedPendingReward)
-		expect(await tellor.getPendingRewardByStaker(accounts[2].address)).to.equal(0)
+		expect(await tellor.callStatic.getPendingRewardByStaker(accounts[2].address)).to.equal(0)
 	})
 
 	it("getIndexForDataBefore()", async function () {
