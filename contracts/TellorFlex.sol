@@ -2,8 +2,6 @@
 pragma solidity 0.8.3;
 
 import "./interfaces/IERC20.sol";
-import "./interfaces/IGovernance.sol";
-import "hardhat/console.sol";
 
 /**
  @author Tellor Inc.
@@ -164,9 +162,18 @@ contract TellorFlex {
             if (_stakedBalance == 0) {
                 // if staked balance and locked balance equal 0, save current vote tally.
                 // voting participation used for calculating rewards
-                _staker.startVoteCount = IGovernance(governance).getVoteCount();
-                _staker.startVoteTally = IGovernance(governance)
-                    .getVoteTallyByAddress(msg.sender);
+                (bool _success, bytes memory _returnData) = governance.call(
+                    abi.encodeWithSignature("getVoteCount()")
+                );
+                if (_success) {
+                    _staker.startVoteCount = uint256(abi.decode(_returnData, (uint256))) - _staker.startVoteCount;
+                }
+                (_success,_returnData) = governance.call(
+                    abi.encodeWithSignature("getVoteTallyByAddress(address)",msg.sender)
+                );
+                if(_success){
+                    _staker.startVoteTally =  abi.decode(_returnData,(uint256));
+                }
             }
             require(token.transferFrom(msg.sender, address(this), _amount));
         }
@@ -224,7 +231,6 @@ contract TellorFlex {
         uint256 _stakedBalance = _staker.stakedBalance;
         uint256 _lockedBalance = _staker.lockedBalance;
         require(_stakedBalance + _lockedBalance > 0, "zero staker balance");
-        uint256 _slashAmount;
         if (_lockedBalance >= stakeAmount) {
             // if locked balance is at least stakeAmount, slash from locked balance
             _slashAmount = stakeAmount;
@@ -295,8 +301,7 @@ contract TellorFlex {
         _report.valueByTimestamp[block.timestamp] = _value;
         _report.reporterByTimestamp[block.timestamp] = msg.sender;
         // Disperse Time Based Reward
-        uint256 _timeDiff = block.timestamp - timeOfLastNewValue;
-        uint256 _reward = (_timeDiff * timeBasedReward) / 300; //.5 TRB per 5 minutes
+        uint256 _reward = ((block.timestamp - timeOfLastNewValue) * timeBasedReward) / 300; //.5 TRB per 5 minutes
         uint256 _totalTimeBasedRewardsBalance =
             token.balanceOf(address(this)) -
             (totalStakeAmount + stakingRewardsBalance);
@@ -399,7 +404,9 @@ contract TellorFlex {
         view
         returns (bytes memory _value)
     {
-        (,_value,) = getDataBefore(_queryId, block.timestamp + 1);
+        bool _didGet;
+        (_didGet, _value, ) = getDataBefore(_queryId, block.timestamp + 1);
+        if(!_didGet){revert();}
     }
 
     /**
@@ -424,11 +431,9 @@ contract TellorFlex {
             _timestamp
         );
         if (!_found) return (false, bytes(""), 0);
-        uint256 _time = getTimestampbyQueryIdandIndex(_queryId, _index);
-        _value = retrieveData(_queryId, _time);
-        if (keccak256(_value) != keccak256(bytes("")))
-            return (true, _value, _time);
-        return (false, bytes(""), 0);
+        _timestampRetrieved = getTimestampbyQueryIdandIndex(_queryId, _index);
+        _value = retrieveData(_queryId, _timestampRetrieved);
+        return (true, _value, _timestampRetrieved);
     }
 
     /**
@@ -455,29 +460,34 @@ contract TellorFlex {
     /**
      * @dev Returns the pending staking reward for a given address
      * @param _stakerAddress staker address to look up
-     * @return uint256 pending reward for given staker
+     * @return _pendingReward - pending reward for given staker
      */
     function getPendingRewardByStaker(address _stakerAddress)
         external
-        view
-        returns (uint256)
+        returns (uint256 _pendingReward)
     {
         StakeInfo storage _staker = stakerDetails[_stakerAddress];
-        uint256 _pendingReward = (_staker.stakedBalance *
+        _pendingReward = (_staker.stakedBalance *
             _getUpdatedAccumulatedRewardPerShare()) /
             1e18 -
             _staker.rewardDebt;
-        uint256 _numberOfVotes = IGovernance(governance).getVoteCount() -
-            _staker.startVoteCount;
-        if (_numberOfVotes > 0) {
-            _pendingReward =
-                (_pendingReward *
-                    (IGovernance(governance).getVoteTallyByAddress(
-                        _stakerAddress
-                    ) - _staker.startVoteTally)) /
-                _numberOfVotes;
+        (bool _success, bytes memory _returnData) = governance.call(
+            abi.encodeWithSignature("getVoteCount()")
+        );
+        uint256 _numberOfVotes;
+        if (_success) {
+                _numberOfVotes = uint256(abi.decode(_returnData, (uint256))) - _staker.startVoteCount;
         }
-        return _pendingReward;
+        if (_numberOfVotes > 0) {
+                (_success,_returnData) = governance.call(
+                    abi.encodeWithSignature("getVoteTallyByAddress(address)",_stakerAddress)
+                );
+                if(_success){
+                    _pendingReward =
+                        (_pendingReward * (abi.decode(_returnData,(uint256)) - _staker.startVoteTally)) 
+                        / _numberOfVotes;
+                }
+        }
     }
 
     /**
@@ -504,8 +514,7 @@ contract TellorFlex {
         view
         returns (address, bool)
     {
-        bool _wasRemoved = reports[_queryId].isDisputed[_timestamp];
-        return (reports[_queryId].reporterByTimestamp[_timestamp], _wasRemoved);
+        return (reports[_queryId].reporterByTimestamp[_timestamp], reports[_queryId].isDisputed[_timestamp]);
     }
 
     /**
@@ -895,12 +904,16 @@ contract TellorFlex {
             }
             if (_numberOfVotes > 0) {
                 // staking reward = pending reward * voting participation rate
-                _pendingReward =
-                    (_pendingReward *
-                        (IGovernance(governance).getVoteTallyByAddress(
-                            _stakerAddress
-                        ) - _staker.startVoteTally)) /
-                    _numberOfVotes;
+                (_success, _returnData) = governance.call(
+                    abi.encodeWithSignature("getVoteTallyByAddress(address)",_stakerAddress)
+                );
+                if(_success){
+                    uint256 _voteTally = abi.decode(_returnData,(uint256));
+                    _pendingReward =
+                        (_pendingReward *
+                            (_voteTally - _staker.startVoteTally)) /
+                        _numberOfVotes;
+                }
             }
             stakingRewardsBalance -= _pendingReward;
             require(token.transfer(msg.sender, _pendingReward));
