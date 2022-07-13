@@ -4,7 +4,7 @@ const h = require("./helpers/helpers");
 const web3 = require('web3');
 const BN = ethers.BigNumber.from
 
-describe("TellorFlex Function Tests", function () {
+describe("TellorFlex - Function Tests", function () {
 
 	let tellor;
 	let token;
@@ -31,7 +31,8 @@ describe("TellorFlex Function Tests", function () {
 		reporterLastTimestamp: 4,
 		reportsSubmitted: 5,
 		startVoteCount: 6,
-		startVoteTally: 7
+		startVoteTally: 7,
+        staked: 8
 	} // getStakerInfo() indices
 
 	beforeEach(async function () {
@@ -96,6 +97,7 @@ describe("TellorFlex Function Tests", function () {
 		expect(stakerDetails[smap.reportsSubmitted]).to.equal(0) // reportsSubmitted
 		expect(stakerDetails[smap.startVoteCount]).to.equal(0) // startVoteCount
 		expect(stakerDetails[smap.startVoteTally]).to.equal(0) // startVoteTally
+		expect(stakerDetails[smap.staked]).to.equal(true) // staked
 		expect(await tellor.totalRewardDebt()).to.equal(0)
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("10"))
 
@@ -124,10 +126,12 @@ describe("TellorFlex Function Tests", function () {
 		await h.expectThrow(tellor.connect(govSigner).removeValue(QUERYID1, 500)) // invalid value
 		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.bytes(100))
 		await h.expectThrow(tellor.connect(accounts[1]).removeValue(QUERYID1, blocky.timestamp)) // test require: only gov can removeValue
+		expect(await tellor.isInDispute(QUERYID1, blocky.timestamp)).to.be.false
 		await tellor.connect(govSigner).removeValue(QUERYID1, blocky.timestamp)
-		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(0)
+		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(1)
 		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal("0x")
-		await h.expectThrow(tellor.connect(govSigner).removeValue(QUERYID1, blocky.timestamp)) // test require: invalid timestamp
+		expect(await tellor.isInDispute(QUERYID1, blocky.timestamp)).to.be.true
+		await h.expectThrow(tellor.connect(govSigner).removeValue(QUERYID1, blocky.timestamp)) // test require: value already disputed
 
 		// Test min/max values for _timestamp argument
 		await h.advanceTime(60 * 60 * 12)
@@ -146,6 +150,7 @@ describe("TellorFlex Function Tests", function () {
 		expect(stakerDetails[smap.startDate]).to.equal(blocky.timestamp)
 		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("100"))
 		expect(stakerDetails[smap.lockedBalance]).to.equal(0)
+		expect(stakerDetails[smap.staked]).to.equal(true)
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("100"))
 		expect(await tellor.totalRewardDebt()).to.equal(0)
 		await h.expectThrow(tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("101"))) // test require: insufficient staked balance
@@ -157,6 +162,7 @@ describe("TellorFlex Function Tests", function () {
 		expect(stakerDetails[smap.rewardDebt]).to.equal(0)
 		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("90"))
 		expect(stakerDetails[smap.lockedBalance]).to.equal(web3.utils.toWei("10"))
+		expect(stakerDetails[smap.staked]).to.equal(true)
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("90"))
 		expect(await tellor.totalRewardDebt()).to.equal(0)
 
@@ -169,6 +175,7 @@ describe("TellorFlex Function Tests", function () {
 		expect(stakerDetails[smap.rewardDebt]).to.equal(0)
 		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("90"))
 		expect(stakerDetails[smap.lockedBalance]).to.equal(web3.utils.toWei("10"))
+		expect(stakerDetails[smap.staked]).to.equal(true)
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("90"))
 		expect(await tellor.totalRewardDebt()).to.equal(0)
 
@@ -197,6 +204,7 @@ describe("TellorFlex Function Tests", function () {
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
 		expect(stakerDetails[smap.stakedBalance]).to.equal(web3.utils.toWei("90"))
 		expect(stakerDetails[smap.lockedBalance]).to.equal(0)
+		expect(stakerDetails[smap.staked]).to.equal(true)
 		expect(await tellor.totalStakers()).to.equal(1) // Still one staker bc account#1 has 90 staked & stake amount is 10
 		expect(await token.balanceOf(accounts[2].address)).to.equal(web3.utils.toWei("10"))
 		expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("90"))
@@ -509,11 +517,9 @@ describe("TellorFlex Function Tests", function () {
 	})
 
 	it("updateTotalTimeBasedRewardsBalance", async function () {
-		expect(BN(await tellor.totalTimeBasedRewardsBalance())).to.equal(0)
+		expect(BN(await tellor.getTotalTimeBasedRewardsBalance())).to.equal(0)
 		await token.connect(accounts[1]).transfer(tellor.address, web3.utils.toWei("100"))
-		expect(BN(await tellor.totalTimeBasedRewardsBalance())).to.equal(0)
-		await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
-		expect(BN(await tellor.totalTimeBasedRewardsBalance())).to.equal(web3.utils.toWei("100"))
+		expect(BN(await tellor.getTotalTimeBasedRewardsBalance())).to.equal(web3.utils.toWei("100"))
 	})
 
 	it("addStakingRewards", async function () {
@@ -573,36 +579,104 @@ describe("TellorFlex Function Tests", function () {
 		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("1000"))
 
 		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100), 0, '0x')
+		blocky0 = await h.getBlock()
 		await h.advanceTime(60 * 60 * 12)
 		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100), 1, '0x')
+		blocky1 = await h.getBlock()
 		await h.advanceTime(60 * 60 * 12)
 		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100), 2, '0x')
-
-		blocky3 = await h.getBlock()
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky3.timestamp)
+		blocky2 = await h.getBlock()
+		
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
 
 		// advance time one year and test
 		await h.advanceTime(86400 * 365)
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky3.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
 
 		// advance time one year and test
 		await h.advanceTime(86400 * 365)
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky3.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
 
 		for(i = 0; i < 50; i++) {
-			await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100 + i), 0, '0x')
 			await h.advanceTime(60 * 60 * 12)
+			await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100 + i), 0, '0x')
 		}
+		blocky52 = await h.getBlock()
+		
+		// test last value disputed
+		await tellor.connect(govSigner).removeValue(QUERYID2, blocky52.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky52.timestamp + 1)
+		expect(index[0]).to.be.true
+		expect(index[1]).to.equal(51)
 
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky3.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
+
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp + 1)
+		expect(index[0]).to.be.true
+		expect(index[1]).to.equal(2)
+
+		// remove value at index 2
+		await tellor.connect(govSigner).removeValue(QUERYID2, blocky2.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp)
+		expect(index[0]).to.be.true
+		expect(index[1]).to.equal(1)
+
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp + 1)
+		expect(index[0]).to.be.true
+		expect(index[1]).to.equal(1)
+
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky1.timestamp + 1)
+		expect(index[0]).to.be.true
+		expect(index[1]).to.equal(1)
+
+		await tellor.connect(govSigner).removeValue(QUERYID2, blocky1.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp - 1)
+		expect(index[0]).to.be.true
+		expect(index[1]).to.equal(0)
+
+		await tellor.connect(govSigner).removeValue(QUERYID2, blocky0.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp - 1)
+		expect(index[0]).to.be.false
+		expect(index[1]).to.equal(0)
+
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+		blocky0 = await h.getBlock()
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+		blocky1 = await h.getBlock()
+
+		await tellor.connect(govSigner).removeValue(QUERYID1, blocky0.timestamp)
+		await tellor.connect(govSigner).removeValue(QUERYID1, blocky1.timestamp)
+
+		index = await tellor.getIndexForDataBefore(QUERYID1, blocky1.timestamp + 1)
+		expect(index[0]).to.be.false
+		expect(index[1]).to.equal(0)
+
+		index = await tellor.getIndexForDataBefore(QUERYID1, blocky0.timestamp + 1)
+		expect(index[0]).to.be.false
+		expect(index[1]).to.equal(0)
+
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+		blocky2 = await h.getBlock()
+
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+		// blocky3 = await h.getBlock()
+
+		await tellor.connect(govSigner).removeValue(QUERYID1, blocky2.timestamp)
+		index = await tellor.getIndexForDataBefore(QUERYID1, blocky2.timestamp + 1)
+		expect(index[0]).to.be.false
+		expect(index[1]).to.equal(0)
 	})
 
 	it("getDataBefore()", async function () {
@@ -921,7 +995,26 @@ describe("TellorFlex Function Tests", function () {
         expect(await tellor.stakingRewardsBalance()).to.equal(BN(h.toWei("1000")).sub(expectedBalance).add(h.toWei("990")))
     })
 
-
-
+	it("getRealStakingRewardsBalance", async function () {
+		expect(await tellor.getRealStakingRewardsBalance()).to.equal(0)
+		await token.mint(accounts[0].address, web3.utils.toWei("1000"))
+		await token.approve(tellor.address, web3.utils.toWei("1000"))
+		// add staking rewards
+		await tellor.addStakingRewards(web3.utils.toWei("1000"))
+		expectedRewardRate = Math.floor(h.toWei("1000") / REWARD_RATE_TARGET)
+		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
+		blocky0 = await h.getBlock()
+		// advance time
+		await h.advanceTime(86400 * 10)
+		pendingReward = await tellor.getPendingRewardByStaker(accounts[1].address)
+		blocky1 = await h.getBlock()
+		expectedAccumulatedRewardPerShare = BN(blocky1.timestamp - blocky0.timestamp).mul(expectedRewardRate).div(10)
+		expectedPendingReward = BN(h.toWei("10")).mul(expectedAccumulatedRewardPerShare).div(h.toWei("1"))
+		expectedRealStakingRewardsBalance = BigInt(h.toWei("1000")) - BigInt(expectedPendingReward)
+		expect(await tellor.getRealStakingRewardsBalance()).to.equal(expectedRealStakingRewardsBalance)
+		await h.advanceTime(86400 * 30)
+		expect(await tellor.getRealStakingRewardsBalance()).to.equal(0)
+		expect(await tellor.stakingRewardsBalance()).to.equal(h.toWei("1000"))
+	})
 
 });

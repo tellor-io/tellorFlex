@@ -7,7 +7,7 @@ const { prependOnceListener } = require("process");
 const { stakeAmount } = require("./helpers/helpers");
 const BN = ethers.BigNumber.from
 
-describe("TellorFlex e2e Tests", function () {
+describe("TellorFlex - e2e Tests", function () {
 
     let tellor;
     let governance;
@@ -32,7 +32,8 @@ describe("TellorFlex e2e Tests", function () {
         reporterLastTimestamp: 4,
         reportsSubmitted: 5,
         startVoteCount: 6,
-        startVoteTally: 7
+        startVoteTally: 7,
+        staked: 8
     } // getStakerInfo() indices
 
     beforeEach(async function () {
@@ -365,35 +366,38 @@ describe("TellorFlex e2e Tests", function () {
 
     it("TBR + stakes + staking rewards == balanceOf(flexAddress)", async function () {
         // Setup
-        await token.mint(accounts[1].address, web3.utils.toWei("1000"));
-        await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
-
+        await token.mint(accounts[1].address, web3.utils.toWei("200"));
+        await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("200"))
         // Check balance after adding time-based rewards, stake, & staking rewards
         await token.mint(tellor.address, web3.utils.toWei("100")) // add tb rewards
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("100"))
         await tellor.connect(accounts[1]).addStakingRewards(web3.utils.toWei("100"))
+        await token.connect(accounts[1]).transfer(accounts[10].address, await token.balanceOf(accounts[1].address))
         tellorBalance1 = await token.balanceOf(tellor.address)
-        expect(tellorBalance1).to.equal(web3.utils.toWei("300"))
+        expect(BigInt(tellorBalance1)).to.equal(BigInt(web3.utils.toWei("300")))
 
         // Reduce time-based rewards & check updated balance
-        await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
         await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(420), 0, TRB_QUERY_DATA)
-        rewardsGiven = web3.utils.toWei("100") - await tellor.totalTimeBasedRewardsBalance()
-        tellorBalance2 = await token.balanceOf(tellor.address)
-        expect(tellorBalance2).to.equal(BigInt(tellorBalance1) - BigInt(rewardsGiven))
+        let tbr = await tellor.getTotalTimeBasedRewardsBalance()
+        rewardsGiven = web3.utils.toWei("100") - tbr
+        tellorBalance2 = (await token.balanceOf(tellor.address))*1 + 1*rewardsGiven
+        expect(BigInt(tellorBalance2)).to.equal(BigInt(web3.utils.toWei("300")))
 
         // Check balance after reducing stakes & staking rewards
-        stakingRewards1 = await tellor.stakingRewardsBalance()
-        totalStakes1 = await tellor.totalStakeAmount()
         await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("10"))
         h.advanceTime(60 * 60 * 24 * 7) // 7 days
         await tellor.connect(accounts[1]).withdrawStake()
-        stakingRewards2 = await tellor.stakingRewardsBalance()
-        totalStakes2 = await tellor.totalStakeAmount()
-        tellorBalance3 = await token.balanceOf(tellor.address)
-        totalLoss = (stakingRewards1 - stakingRewards2) + (totalStakes1 - totalStakes2)
-        balanceDiff = tellorBalance2 - tellorBalance3
-        expect(balanceDiff).to.equal(totalLoss)
+        stakingRewards = await tellor.stakingRewardsBalance()
+        totalStakes = await tellor.totalStakeAmount()
+        tbr = await tellor.getTotalTimeBasedRewardsBalance()
+        sum = BigInt(stakingRewards) + BigInt(totalStakes) + BigInt(tbr)
+        tellorBalance = await token.balanceOf(tellor.address)
+        expect(BigInt(tellorBalance)).to.equal(sum)
+
+        // Check that all funds are accounted for
+        acct1Bal = await token.balanceOf(accounts[1].address)
+        sum = BigInt(acct1Bal) + BigInt(tellorBalance)
+        expect(sum).to.equal(BigInt(web3.utils.toWei("300")))
     })
 
     it("TBR, stakes, and staking rewards reach 0", async function () {
@@ -410,7 +414,6 @@ describe("TellorFlex e2e Tests", function () {
 
         // Zero time-based rewards & check updated balance
         h.advanceTime(60 * 1000)
-        await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
         await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(420), 0, TRB_QUERY_DATA)
         expect(await token.balanceOf(tellor.address)).to.equal(web3.utils.toWei("200"))
 
@@ -434,11 +437,9 @@ describe("TellorFlex e2e Tests", function () {
 
         // Ensure no borrow after time-based rewards drained
         h.advanceTime(60 * 1000)
-        await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
         await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(420), 0, TRB_QUERY_DATA)
-        expect(await tellor.totalTimeBasedRewardsBalance()).to.equal(0)
+        expect(await tellor.getTotalTimeBasedRewardsBalance()).to.equal(0)
         h.advanceTime(60 * 1000)
-        await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
         await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(420), 1, TRB_QUERY_DATA)
         expect(await tellor.stakingRewardsBalance()).to.equal(web3.utils.toWei("100"))
         expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("100"))
@@ -450,8 +451,7 @@ describe("TellorFlex e2e Tests", function () {
         expect(await tellor.stakingRewardsBalance()).to.equal(0)
         h.advanceTime(60 * 60 * 24 * 30)
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei(".5"))
-        await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
-        expect(await tellor.totalTimeBasedRewardsBalance()).to.equal(web3.utils.toWei("100"))
+        expect(await tellor.getTotalTimeBasedRewardsBalance()).to.equal(web3.utils.toWei("100"))
         expect(await tellor.totalStakeAmount()).to.equal(web3.utils.toWei("101"))
         await tellor.connect(accounts[1]).addStakingRewards(web3.utils.toWei("100"))
 
@@ -460,11 +460,10 @@ describe("TellorFlex e2e Tests", function () {
         await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("101"))
         h.advanceTime(60 * 60 * 24 * 7) // 7 days
         await tellor.connect(accounts[1]).withdrawStake()
-        await tellor.connect(accounts[1]).updateTotalTimeBasedRewardsBalance()
         stakingRewards2 = await tellor.stakingRewardsBalance()
         stakingRewardsLoss = BigInt(stakingRewards1) - BigInt(stakingRewards2)
         expect(await tellor.totalStakeAmount()).to.equal(0)
-        expect(await tellor.totalTimeBasedRewardsBalance()).to.equal(web3.utils.toWei("100"))
+        expect(await tellor.getTotalTimeBasedRewardsBalance()).to.equal(web3.utils.toWei("100"))
         expect(await tellor.stakingRewardsBalance()).to.equal(BigInt(web3.utils.toWei("100")) - BigInt(stakingRewardsLoss))
     })
 
@@ -516,5 +515,27 @@ describe("TellorFlex e2e Tests", function () {
         await tellor.updateStakeAmount()
         expectedStakeAmount = BigInt(STAKE_AMOUNT_USD_TARGET) * BigInt(1e18) / BigInt(lowPrice);
         expect(await tellor.stakeAmount()).to.equal(expectedStakeAmount)
+    })
+
+    it("stake deposits round down when divided into multiple stakes (ex. 21 -> 2)", async function() {
+        // Setup
+        await token.mint(accounts[1].address, h.toWei("30"))
+        await token.approve(tellor.address, h.toWei("30"))
+        await tellor.connect(accounts[1]).depositStake(h.toWei("9"))
+
+        // ensure can't submit value with less than one stake
+        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x'))
+
+        // stake a single stake amount
+        await tellor.connect(accounts[1]).depositStake(h.toWei("1"))
+        tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x')
+
+        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x'))
+        await tellor.connect(accounts[1]).depositStake(h.toWei("9"))
+        await h.advanceTime(60 * 60 * 6)
+
+        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x'))
+        await tellor.connect(accounts[1]).depositStake(h.toWei("1"))
+        tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x')
     })
 })

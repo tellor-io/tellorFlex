@@ -4,7 +4,7 @@ const h = require("./helpers/helpers");
 const web3 = require('web3');
 const BN = ethers.BigNumber.from
 
-describe("TellorFlex Function Tests -- Init Fn", function() {
+describe("TellorFlex - Function Tests Init Function", function() {
 
 	let tellor;
 	let token;

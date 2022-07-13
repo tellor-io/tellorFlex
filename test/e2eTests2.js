@@ -6,7 +6,7 @@ const web3 = require('web3');
 const { prependOnceListener } = require("process");
 const BN = ethers.BigNumber.from
 
-describe("TellorFlex e2e Tests - Two", function() {
+describe("TellorFlex - e2e Tests Two", function() {
 
 	let tellor;
     let governance;
@@ -31,7 +31,8 @@ describe("TellorFlex e2e Tests - Two", function() {
 		reporterLastTimestamp: 4,
 		reportsSubmitted: 5,
 		startVoteCount: 6,
-		startVoteTally: 7
+		startVoteTally: 7,
+        staked: 8
 	} // getStakerInfo() indices
 
 	beforeEach(async function () {
