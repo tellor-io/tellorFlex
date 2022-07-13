@@ -404,7 +404,9 @@ contract TellorFlex {
         view
         returns (bytes memory _value)
     {
-        (,_value,) = getDataBefore(_queryId, block.timestamp + 1);
+        bool _didGet;
+        (_didGet, _value, ) = getDataBefore(_queryId, block.timestamp + 1);
+        if(!_didGet){revert();}
     }
 
     /**
