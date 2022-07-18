@@ -268,6 +268,7 @@ contract TellorFlex {
         uint256 _nonce,
         bytes calldata _queryData
     ) external {
+        require(keccak256(_value) != keccak256(""), "value must be submitted");
         Report storage _report = reports[_queryId];
         require(
             _nonce == _report.timestamps.length || _nonce == 0,
