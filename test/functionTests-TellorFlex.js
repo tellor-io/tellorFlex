@@ -265,7 +265,7 @@ describe("TellorFlex - Function Tests", function () {
 
 	it("submitValue", async function () {
 		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("120"))
-
+		await h.expectThrow(tellor.connect(accounts[1]).submitValue(QUERYID1,'0x', 0, '0x')) //must submit a value
 		await h.expectThrow(tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4000), 1, '0x')) // test require: wrong nonce
 		await h.expectThrow(tellor.connect(accounts[2]).submitValue(QUERYID1, h.uintTob32(4000), 1, '0x')) // test require: insufficient staked balance
 		await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(101), h.uintTob32(4000), 0, '0x')) // test require: non-legacy queryId must equal hash(queryData)
