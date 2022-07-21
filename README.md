@@ -8,9 +8,9 @@ For more in-depth information about Tellor checkout our [documentation](https://
 
 Quick references are included below:
 
-* <b> [Reporter Documentation](https://docs.tellor.io/tellor/telliot/telliot)</b>
+* <b> [Reporter Documentation](https://docs.tellor.io/tellor/reporting-data/introduction)</b>
 
-* <b> [Integration Documentation](https://docs.tellor.io/tellor/integration/introduction)</b>
+* <b> [Integration Documentation](https://docs.tellor.io/tellor/getting-data/introduction)</b>
 
 ## Setting up and testing
 
