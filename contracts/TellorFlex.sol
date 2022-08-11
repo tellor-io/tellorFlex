@@ -166,7 +166,7 @@ contract TellorFlex {
                     abi.encodeWithSignature("getVoteCount()")
                 );
                 if (_success) {
-                    _staker.startVoteCount = uint256(abi.decode(_returnData, (uint256))) - _staker.startVoteCount;
+                    _staker.startVoteCount = uint256(abi.decode(_returnData, (uint256)));
                 }
                 (_success,_returnData) = governance.call(
                     abi.encodeWithSignature("getVoteTallyByAddress(address)",msg.sender)
