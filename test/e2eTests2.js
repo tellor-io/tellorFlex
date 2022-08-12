@@ -203,4 +203,45 @@ describe("TellorFlex - e2e Tests Two", function() {
         ratio = BigInt(stakerInfo2[smap.rewardDebt]) / BigInt(stakerInfo1[smap.rewardDebt])
         expect(ratio).to.equal(BigInt(2))
     })
+
+    it("open dispute A when reporter stakes, reporter votes on A and one more B", async function() {
+        // create 2 disputes
+        await governance.beginDisputeMock()
+        await governance.beginDisputeMock()
+        // vote on one dispute
+        await governance.connect(accounts[2]).voteMock(1)
+        // deposit stake
+        await token.mint(accounts[2].address, h.toWei("10"))
+        await token.connect(accounts[2]).approve(tellor.address, h.toWei("100"))
+        await tellor.connect(accounts[2]).depositStake(h.toWei("10"))
+        // check staker info
+        stakerInfo = await tellor.getStakerInfo(accounts[2].address)
+        expect(stakerInfo[smap.stakedBalance]).to.equal(h.toWei("10")) // staked balance
+        expect(stakerInfo[smap.startVoteCount]).to.equal(2) // startVoteCount
+        expect(stakerInfo[smap.startVoteTally]).to.equal(1) // startVoteTally
+        // start a dispute
+        await governance.beginDisputeMock()
+        // vote
+        await governance.connect(accounts[2]).voteMock(2)
+        await governance.connect(accounts[2]).voteMock(3)
+        // deposit staking rewards
+        await token.mint(accounts[0].address, h.toWei("1000"))
+        await token.connect(accounts[0]).approve(tellor.address, h.toWei("1000"))
+        await tellor.connect(accounts[0]).addStakingRewards(h.toWei("1000"))
+        // advance time
+        await h.advanceTime(86400 * 31)
+        // withdraw stake
+        await tellor.connect(accounts[2]).requestStakingWithdraw(h.toWei("10"))
+        await h.advanceTime(86400 * 7)
+        await tellor.connect(accounts[2]).withdrawStake()
+        // check reporter bal
+        expect(await token.balanceOf(accounts[2].address)).to.equal(h.toWei("1010"))
+
+        // stake again, check staker info
+        await tellor.connect(accounts[2]).depositStake(h.toWei("10"))
+        stakerInfo = await tellor.getStakerInfo(accounts[2].address)
+        expect(stakerInfo[smap.stakedBalance]).to.equal(h.toWei("10")) // staked balance
+        expect(stakerInfo[smap.startVoteCount]).to.equal(3) // startVoteCount
+        expect(stakerInfo[smap.startVoteTally]).to.equal(3) // startVoteTally
+    })
 })

@@ -910,10 +910,13 @@ contract TellorFlex {
                 );
                 if(_success){
                     uint256 _voteTally = abi.decode(_returnData,(uint256));
-                    _pendingReward =
+                    uint256 _tempPendingReward =
                         (_pendingReward *
                             (_voteTally - _staker.startVoteTally)) /
                         _numberOfVotes;
+                    if (_tempPendingReward < _pendingReward) {
+                        _pendingReward = _tempPendingReward;
+                    }
                 }
             }
             stakingRewardsBalance -= _pendingReward;
