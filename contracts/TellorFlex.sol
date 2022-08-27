@@ -139,6 +139,7 @@ contract TellorFlex {
      * @param _amount amount of tokens to stake
      */
     function depositStake(uint256 _amount) external {
+        require(governance != address(0), "governance address not set");
         StakeInfo storage _staker = stakerDetails[msg.sender];
         uint256 _stakedBalance = _staker.stakedBalance;
         uint256 _lockedBalance = _staker.lockedBalance;
