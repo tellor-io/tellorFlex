@@ -9,12 +9,8 @@ contract TestFlex is TellorFlex {
         uint256 _reportingLock,
         uint256 _stakeAmountDollarTarget,
         uint256 _stakingTokenPrice,
-        uint256 _stakingTokenPriceDecimals,
-        bytes32 _stakingTokenPriceQueryId,
-        uint256 _baseTokenPrice,
-        uint256 _baseTokenPriceDecimals,
-        bytes32 _baseTokenPriceQueryId
-    ) TellorFlex(_token, _reportingLock, _stakeAmountDollarTarget, _stakingTokenPrice, _stakingTokenPriceDecimals, _stakingTokenPriceQueryId, _baseTokenPrice, _baseTokenPriceDecimals, _baseTokenPriceQueryId) {}
+        bytes32 _stakingTokenPriceQueryId
+    ) TellorFlex(_token, _reportingLock, _stakeAmountDollarTarget, _stakingTokenPrice, _stakingTokenPriceQueryId) {}
 
     function updateRewards() external {
         _updateRewards();

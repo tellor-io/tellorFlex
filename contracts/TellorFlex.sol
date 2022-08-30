@@ -17,16 +17,11 @@ contract TellorFlex {
     address public governance; // address with ability to remove values and slash reporters
     address public owner; // contract deployer, can call init function once
     uint256 public accumulatedRewardPerShare; // accumulated staking reward per staked token
-    uint256 public baseTokenPrice; // base token price, used for recording report gas costs
-    uint256 public baseTokenPriceDecimals; // number of decimals in reported base token price
-    bytes32 public baseTokenPriceQueryId; // base token SpotPrice queryId, used for recording report gas costs
     uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
     uint256 public rewardRate; // total staking rewards released per second
     uint256 public stakeAmount; // minimum amount required to be a staker
     uint256 public stakeAmountDollarTarget; // amount of US dollars required to be a staker
     uint256 public stakingRewardsBalance; // total amount of staking rewards
-    uint256 public stakingTokenPrice; // staking token price, used for recording report gas costs
-    uint256 public stakingTokenPriceDecimals; // number of decimals in reported staking token price
     bytes32 public stakingTokenPriceQueryId; // staking token SpotPrice queryId, used for updating stakeAmount
     uint256 public timeBasedReward = 5e17; // amount of TB rewards released per 5 minutes
     uint256 public timeOfLastAllocation; // time of last update to accumulatedRewardPerShare
@@ -47,7 +42,6 @@ contract TellorFlex {
         mapping(uint256 => bytes) valueByTimestamp; // mapping of timestamps to values
         mapping(uint256 => address) reporterByTimestamp; // mapping of timestamps to reporters
         mapping(uint256 => bool) isDisputed;
-        mapping(uint256 => uint256) gasUsed; // mapping of timestamps to estimated gas used in terms of staking token
     }
 
     struct StakeInfo {
@@ -91,37 +85,24 @@ contract TellorFlex {
      * @param _stakeAmountDollarTarget fixed USD amount that stakeAmount targets on updateStakeAmount
      * @param _stakingTokenPrice current price of staking token in USD (18 decimals)
      * @param _stakingTokenPriceQueryId queryId where staking token price is reported
-     * @param _baseTokenPrice current price of base token in USD (18 decimals)
-     * @param _baseTokenPriceQueryId queryId where base token price is reported
      */
     constructor(
         address _token,
         uint256 _reportingLock,
         uint256 _stakeAmountDollarTarget,
         uint256 _stakingTokenPrice,
-        uint256 _stakingTokenPriceDecimals,
-        bytes32 _stakingTokenPriceQueryId,
-        uint256 _baseTokenPrice,
-        uint256 _baseTokenPriceDecimals,
-        bytes32 _baseTokenPriceQueryId
+        bytes32 _stakingTokenPriceQueryId
     ) {
         require(_token != address(0), "must set token address");
-        require(_baseTokenPrice > 0, "must set base token price");
         require(_stakingTokenPrice > 0, "must set staking token price");
         require(_reportingLock > 0, "must set reporting lock");
         require(_stakingTokenPriceQueryId != bytes32(0), "must set staking token price queryId");
-        require(_baseTokenPriceQueryId != bytes32(0), "must set base token price queryId");
         token = IERC20(_token);
         owner = msg.sender;
         reportingLock = _reportingLock;
         stakeAmountDollarTarget = _stakeAmountDollarTarget;
         stakeAmount = (_stakeAmountDollarTarget * 1e18) / _stakingTokenPrice;
-        stakingTokenPrice = _stakingTokenPrice;
-        stakingTokenPriceDecimals = _stakingTokenPriceDecimals;
         stakingTokenPriceQueryId = _stakingTokenPriceQueryId;
-        baseTokenPrice = _baseTokenPrice;
-        baseTokenPriceDecimals = _baseTokenPriceDecimals;
-        baseTokenPriceQueryId = _baseTokenPriceQueryId;
     }
 
     /**
@@ -290,7 +271,6 @@ contract TellorFlex {
         uint256 _nonce,
         bytes calldata _queryData
     ) external {
-        uint256 _startGas = gasleft();
         require(keccak256(_value) != keccak256(""), "value must be submitted");
         Report storage _report = reports[_queryId];
         require(
@@ -348,8 +328,6 @@ contract TellorFlex {
             _queryData,
             msg.sender
         );
-        // Record gas used, used for capping autopay rewards
-        _report.gasUsed[block.timestamp] = (tx.gasprice * (_startGas + 21000 - gasleft()) * baseTokenPrice) / stakingTokenPrice;
     }
 
     /**
@@ -363,25 +341,13 @@ contract TellorFlex {
             block.timestamp - 12 hours
         );
         if (_valFound) {
-            uint256 _stakingTokenPrice = abi.decode(_val, (uint256)) * 10**(18 - stakingTokenPriceDecimals);
+            uint256 _stakingTokenPrice = abi.decode(_val, (uint256));
             require(
                 _stakingTokenPrice >= 0.01 ether && _stakingTokenPrice < 1000000 ether,
                 "invalid staking token price"
             );
             stakeAmount = (stakeAmountDollarTarget * 1e18) / _stakingTokenPrice;
-            stakingTokenPrice = _stakingTokenPrice;
             emit NewStakeAmount(stakeAmount);
-        }
-        // get base token price
-        (_valFound, _val, ) = getDataBefore(
-            baseTokenPriceQueryId,
-            block.timestamp - 12 hours
-        );
-        if (_valFound) {
-            uint256 _baseTokenPrice = abi.decode(_val, (uint256)) * 10**(18 - baseTokenPriceDecimals);
-            if(_baseTokenPrice >= 0.01 ether && _baseTokenPrice < 1000000000 ether) {
-                baseTokenPrice = _baseTokenPrice;
-            }
         }
     }
 
@@ -473,16 +439,6 @@ contract TellorFlex {
         _timestampRetrieved = getTimestampbyQueryIdandIndex(_queryId, _index);
         _value = retrieveData(_queryId, _timestampRetrieved);
         return (true, _value, _timestampRetrieved);
-    }
-
-    /**
-     * @dev Retrieves report gas cost estimate in terms of staking token
-     * @param _queryId is the datafeed unique identifier
-     * @param _timestamp is the timestamp of the report
-     * @return uint256 gas cost estimate in terms of staking token
-     */
-    function getGasUsedByReport(bytes32 _queryId, uint256 _timestamp) external view returns (uint256) {
-        return reports[_queryId].gasUsed[_timestamp];
     }
 
     /**

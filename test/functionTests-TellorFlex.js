@@ -15,7 +15,6 @@ describe("TellorFlex - Function Tests", function () {
 	let owner;
 	const STAKE_AMOUNT_USD_TARGET = web3.utils.toWei("500");
 	const PRICE_TRB = web3.utils.toWei("50");
-	const PRICE_ETH = web3.utils.toWei("1000");
 	const REQUIRED_STAKE = web3.utils.toWei((parseInt(web3.utils.fromWei(STAKE_AMOUNT_USD_TARGET)) / parseInt(web3.utils.fromWei(PRICE_TRB))).toString());
 	const REPORTING_LOCK = 43200; // 12 hours
 	const QUERYID1 = h.uintTob32(1)
@@ -25,9 +24,6 @@ describe("TellorFlex - Function Tests", function () {
 	const TRB_QUERY_DATA_ARGS = abiCoder.encode(["string", "string"], ["trb", "usd"])
 	const TRB_QUERY_DATA = abiCoder.encode(["string", "bytes"], ["SpotPrice", TRB_QUERY_DATA_ARGS])
 	const TRB_QUERY_ID = ethers.utils.keccak256(TRB_QUERY_DATA)
-	const ETH_QUERY_DATA_ARGS = abiCoder.encode(["string", "string"], ["eth", "usd"])
-	const ETH_QUERY_DATA = abiCoder.encode(["string", "bytes"], ["SpotPrice", ETH_QUERY_DATA_ARGS])
-	const ETH_QUERY_ID = ethers.utils.keccak256(ETH_QUERY_DATA)
 	const smap = {
 		startDate: 0,
 		stakedBalance: 1,
@@ -50,7 +46,7 @@ describe("TellorFlex - Function Tests", function () {
 		governance = await Governance.deploy();
 		await governance.deployed();
 		const TellorFlex = await ethers.getContractFactory("TestFlex");
-		tellor = await TellorFlex.deploy(token.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB, 18, TRB_QUERY_ID, PRICE_ETH, 18, ETH_QUERY_ID);
+		tellor = await TellorFlex.deploy(token.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB, TRB_QUERY_ID);
 		owner = await ethers.getSigner(await tellor.owner())
 		await tellor.deployed();
 		await governance.setTellorAddress(tellor.address);
@@ -310,15 +306,6 @@ describe("TellorFlex - Function Tests", function () {
 		await h.advanceTime(3600)
 		await expect(tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4001), ethers.constants.MaxUint256, '0x')).to.be.revertedWith("nonce must match timestamp index")
 
-		// Test recorded gas used
-		gasPrice = BigInt(1e9)
-        gasUsed = 218979
-
-        gasUsedByReport = await tellor.getGasUsedByReport(h.uintTob32(1), blocky.timestamp)
-        expectedGasUsedEstimate = BigInt(gasPrice) * BigInt(gasUsed) * BigInt(PRICE_ETH) / BigInt(PRICE_TRB)
-
-        assert(gasUsedByReport > expectedGasUsedEstimate * BigInt(9) / BigInt(10), "gasUsedByReport is too low")
-        assert(gasUsedByReport < expectedGasUsedEstimate * BigInt(11) / BigInt(10), "gasUsedByReport is too high")
 	})
 
 	it("withdrawStake", async function () {
@@ -1032,24 +1019,4 @@ describe("TellorFlex - Function Tests", function () {
 		expect(await tellor.getRealStakingRewardsBalance()).to.equal(0)
 		expect(await tellor.stakingRewardsBalance()).to.equal(h.toWei("1000"))
 	})
-
-	it("getGasUsedByReport", async function() {
-        gasPrice = BigInt(1e9)
-        gasUsed = 254080
-        // Setup
-        await token.mint(accounts[1].address, h.toWei("30"))
-        await token.approve(tellor.address, h.toWei("30"))
-        await tellor.connect(accounts[1]).depositStake(h.toWei("30"))
-
-        // submit value
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x')
-        blocky = await h.getBlock()
-
-        gasUsedByReport = await tellor.getGasUsedByReport(h.uintTob32(1), blocky.timestamp)
-        expectedGasUsedEstimate = BigInt(gasPrice) * BigInt(gasUsed) * BigInt(PRICE_ETH) / BigInt(PRICE_TRB)
-
-        assert(gasUsedByReport > expectedGasUsedEstimate * BigInt(9) / BigInt(10), "gasUsedByReport is too low")
-        assert(gasUsedByReport < expectedGasUsedEstimate * BigInt(11) / BigInt(10), "gasUsedByReport is too high")
-    })
-
 });
