@@ -50,7 +50,7 @@ describe("TellorFlex - Function Tests", function () {
 		governance = await Governance.deploy();
 		await governance.deployed();
 		const TellorFlex = await ethers.getContractFactory("TestFlex");
-		tellor = await TellorFlex.deploy(token.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB, TRB_QUERY_ID, PRICE_ETH, ETH_QUERY_ID);
+		tellor = await TellorFlex.deploy(token.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB, 18, TRB_QUERY_ID, PRICE_ETH, 18, ETH_QUERY_ID);
 		owner = await ethers.getSigner(await tellor.owner())
 		await tellor.deployed();
 		await governance.setTellorAddress(tellor.address);
