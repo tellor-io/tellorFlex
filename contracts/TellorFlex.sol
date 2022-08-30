@@ -2,7 +2,6 @@
 pragma solidity 0.8.3;
 
 import "./interfaces/IERC20.sol";
-import "hardhat/console.sol";
 
 /**
  @author Tellor Inc.
