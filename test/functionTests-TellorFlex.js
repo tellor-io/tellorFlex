@@ -518,7 +518,7 @@ describe("TellorFlex - Function Tests", function () {
 		expect(await tellor.retrieveData(QUERYID1, ethers.constants.MaxUint256)).to.equal(ethers.utils.hexlify("0x"))
 	})
 
-	it("geTotalTimeBasedRewardsBalance", async function () {
+	it("getTotalTimeBasedRewardsBalance", async function () {
 		expect(BN(await tellor.getTotalTimeBasedRewardsBalance())).to.equal(0)
 		await token.connect(accounts[1]).transfer(tellor.address, web3.utils.toWei("100"))
 		expect(BN(await tellor.getTotalTimeBasedRewardsBalance())).to.equal(web3.utils.toWei("100"))
