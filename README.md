@@ -1,4 +1,4 @@
-[![Tests](https://github.com/tellor-io/tellorFlex/actions/workflows/tests.yml/badge.svg)](https://github.com/tellor-io/tellorFlex/actions/workflows/tests.ymli)
+[![Tests](https://github.com/tellor-io/tellorFlex/actions/workflows/tests.yml/badge.svg?branch=360)](https://github.com/tellor-io/tellorFlex/actions/workflows/tests.ymli)
 
 ## Overview <a name="overview"> </a>  
 
