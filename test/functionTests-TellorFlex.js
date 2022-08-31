@@ -3,6 +3,7 @@ const { network, ethers } = require("hardhat");
 const h = require("./helpers/helpers");
 const web3 = require('web3');
 const BN = ethers.BigNumber.from
+var assert = require('assert');
 
 describe("TellorFlex - Function Tests", function () {
 
@@ -304,6 +305,7 @@ describe("TellorFlex - Function Tests", function () {
 		// Test max val for _nonce
 		await h.advanceTime(3600)
 		await expect(tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4001), ethers.constants.MaxUint256, '0x')).to.be.revertedWith("nonce must match timestamp index")
+
 	})
 
 	it("withdrawStake", async function () {
@@ -1017,5 +1019,4 @@ describe("TellorFlex - Function Tests", function () {
 		expect(await tellor.getRealStakingRewardsBalance()).to.equal(0)
 		expect(await tellor.stakingRewardsBalance()).to.equal(h.toWei("1000"))
 	})
-
 });

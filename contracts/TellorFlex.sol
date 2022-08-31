@@ -58,7 +58,6 @@ contract TellorFlex {
     }
 
     // Events
-    event NewGovernanceAddress(address _newGovernanceAddress);
     event NewReport(
         bytes32 indexed _queryId,
         uint256 _time,
@@ -84,22 +83,25 @@ contract TellorFlex {
      * @param _token address of token used for staking and rewards
      * @param _reportingLock base amount of time (seconds) before reporter is able to report again
      * @param _stakeAmountDollarTarget fixed USD amount that stakeAmount targets on updateStakeAmount
-     * @param _priceStakingToken current price of staking token in USD
+     * @param _stakingTokenPrice current price of staking token in USD (18 decimals)
      * @param _stakingTokenPriceQueryId queryId where staking token price is reported
      */
     constructor(
         address _token,
         uint256 _reportingLock,
         uint256 _stakeAmountDollarTarget,
-        uint256 _priceStakingToken,
+        uint256 _stakingTokenPrice,
         bytes32 _stakingTokenPriceQueryId
     ) {
         require(_token != address(0), "must set token address");
+        require(_stakingTokenPrice > 0, "must set staking token price");
+        require(_reportingLock > 0, "must set reporting lock");
+        require(_stakingTokenPriceQueryId != bytes32(0), "must set staking token price queryId");
         token = IERC20(_token);
         owner = msg.sender;
         reportingLock = _reportingLock;
         stakeAmountDollarTarget = _stakeAmountDollarTarget;
-        stakeAmount = (_stakeAmountDollarTarget * 1e18) / _priceStakingToken;
+        stakeAmount = (_stakeAmountDollarTarget * 1e18) / _stakingTokenPrice;
         stakingTokenPriceQueryId = _stakingTokenPriceQueryId;
     }
 
@@ -139,6 +141,7 @@ contract TellorFlex {
      * @param _amount amount of tokens to stake
      */
     function depositStake(uint256 _amount) external {
+        require(governance != address(0), "governance address not set");
         StakeInfo storage _staker = stakerDetails[msg.sender];
         uint256 _stakedBalance = _staker.stakedBalance;
         uint256 _lockedBalance = _staker.lockedBalance;
@@ -166,7 +169,7 @@ contract TellorFlex {
                     abi.encodeWithSignature("getVoteCount()")
                 );
                 if (_success) {
-                    _staker.startVoteCount = uint256(abi.decode(_returnData, (uint256))) - _staker.startVoteCount;
+                    _staker.startVoteCount = uint256(abi.decode(_returnData, (uint256)));
                 }
                 (_success,_returnData) = governance.call(
                     abi.encodeWithSignature("getVoteTallyByAddress(address)",msg.sender)
@@ -332,17 +335,18 @@ contract TellorFlex {
      * 12+-hour-old staking token price from the oracle
      */
     function updateStakeAmount() external {
+        // get staking token price
         (bool _valFound, bytes memory _val, ) = getDataBefore(
             stakingTokenPriceQueryId,
             block.timestamp - 12 hours
         );
         if (_valFound) {
-            uint256 _priceTRB = abi.decode(_val, (uint256));
+            uint256 _stakingTokenPrice = abi.decode(_val, (uint256));
             require(
-                _priceTRB >= 0.01 ether && _priceTRB < 1000000 ether,
-                "invalid trb price"
+                _stakingTokenPrice >= 0.01 ether && _stakingTokenPrice < 1000000 ether,
+                "invalid staking token price"
             );
-            stakeAmount = (stakeAmountDollarTarget * 1e18) / _priceTRB;
+            stakeAmount = (stakeAmountDollarTarget * 1e18) / _stakingTokenPrice;
             emit NewStakeAmount(stakeAmount);
         }
     }
@@ -910,10 +914,13 @@ contract TellorFlex {
                 );
                 if(_success){
                     uint256 _voteTally = abi.decode(_returnData,(uint256));
-                    _pendingReward =
+                    uint256 _tempPendingReward =
                         (_pendingReward *
                             (_voteTally - _staker.startVoteTally)) /
                         _numberOfVotes;
+                    if (_tempPendingReward < _pendingReward) {
+                        _pendingReward = _tempPendingReward;
+                    }
                 }
             }
             stakingRewardsBalance -= _pendingReward;

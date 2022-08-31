@@ -538,4 +538,5 @@ describe("TellorFlex - e2e Tests", function () {
         await tellor.connect(accounts[1]).depositStake(h.toWei("1"))
         tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x')
     })
+    
 })
