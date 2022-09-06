@@ -4,6 +4,7 @@ const h = require("./helpers/helpers");
 var assert = require('assert');
 const web3 = require('web3');
 const { prependOnceListener } = require("process");
+const { assembleTargets } = require("solidity-coverage/plugins/resources/plugin.utils");
 const BN = ethers.BigNumber.from
 
 describe("TellorFlex - e2e Tests Two", function() {
@@ -244,5 +245,100 @@ describe("TellorFlex - e2e Tests Two", function() {
         expect(stakerInfo[smap.stakedBalance]).to.equal(h.toWei("10")) // staked balance
         expect(stakerInfo[smap.startVoteCount]).to.equal(3) // startVoteCount
         expect(stakerInfo[smap.startVoteTally]).to.equal(3) // startVoteTally
+    })
+    it("2 reporters stake and unstake with staking rewards", async function() {
+        await token.mint(accounts[0].address, h.toWei("1000"))
+        await token.mint(accounts[2].address, h.toWei("100"))
+        await token.mint(accounts[3].address, h.toWei("100"))
+
+        // deposit 1st stake
+        await token.connect(accounts[2]).approve(tellor.address, h.toWei("100"))
+        await tellor.connect(accounts[2]).depositStake(h.toWei("100"))
+        blocky0 = await h.getBlock()
+
+        expectedAccumulatedRewardPerShare = 0
+        assert(await tellor.accumulatedRewardPerShare() == expectedAccumulatedRewardPerShare, "accumulatedRewardPerShare should be 0")
+
+        stakerInfo = await tellor.getStakerInfo(accounts[2].address)
+        expectedRewardDebt = 0
+        assert(stakerInfo[smap.rewardDebt] == expectedRewardDebt, "reward debt should be correct") // rewardDebt
+        assert(stakerInfo[smap.stakedBalance] == h.toWei("100"), "Staked balance should be correct") // staked balance
+
+        expectedTotalRewardDebt = 0
+        assert(await tellor.totalRewardDebt() == expectedTotalRewardDebt, "totalRewardDebt should be correct")
+
+        // add staking rewards
+        await token.connect(accounts[0]).approve(tellor.address, h.toWei("1000"))
+        await tellor.connect(accounts[0]).addStakingRewards(h.toWei("1000"))
+        blocky1 = await h.getBlock()
+
+        expectedRewardRate = Math.floor(h.toWei("1000") / REWARD_RATE_TARGET)
+        assert(await tellor.rewardRate() == expectedRewardRate, "rewardRate should be correct")
+
+        expectedAccumulatedRewardPerShare = 0
+        assert(await tellor.accumulatedRewardPerShare() == expectedAccumulatedRewardPerShare, "accumulatedRewardPerShare should be 0")
+
+        expectedTotalRewardDebt = 0
+        assert(await tellor.totalRewardDebt() == expectedTotalRewardDebt, "totalRewardDebt should be correct")
+
+        // deposit 2nd stake
+        await token.connect(accounts[3]).approve(tellor.address, h.toWei("100"))
+        await tellor.connect(accounts[3]).depositStake(h.toWei("100"))
+        blocky2 = await h.getBlock()
+
+        expectedAccumulatedRewardPerShare = BigInt(blocky2.timestamp - blocky1.timestamp) * BigInt(expectedRewardRate) / BigInt(100)
+        assert(await tellor.accumulatedRewardPerShare() == expectedAccumulatedRewardPerShare, "accumulatedRewardPerShare should be correct")
+
+        stakerInfo = await tellor.getStakerInfo(accounts[3].address)
+        expectedRewardDebt = BigInt(expectedAccumulatedRewardPerShare) * BigInt(100)
+        assert(stakerInfo[smap.rewardDebt] == expectedRewardDebt, "rewardDebt should be correct")
+        assert(stakerInfo[smap.stakedBalance] == h.toWei("100"), "Staked balance should be correct") 
+
+        expectedTotalRewardDebt = expectedRewardDebt
+        assert(await tellor.totalRewardDebt() == expectedTotalRewardDebt, "totalRewardDebt should be correct")
+
+        // advance time
+        await h.advanceTime(86400)
+
+        // withdraw 1st stake
+        await tellor.connect(accounts[2]).requestStakingWithdraw(h.toWei("100"))
+        blocky3 = await h.getBlock()
+
+        expectedAccumulatedRewardPerShare = BigInt(blocky3.timestamp - blocky2.timestamp) * BigInt(expectedRewardRate) / BigInt(200) + BigInt(expectedAccumulatedRewardPerShare)
+        assert(await tellor.accumulatedRewardPerShare() == expectedAccumulatedRewardPerShare, "accumulatedRewardPerShare should be correct")
+
+        expectedStakerBalance1 = BigInt(100) * BigInt(expectedAccumulatedRewardPerShare)
+        assert(await token.balanceOf(accounts[2].address) == expectedStakerBalance1, "staker balance should be correct")
+        stakerInfo = await tellor.getStakerInfo(accounts[2].address)
+        assert(stakerInfo[smap.stakedBalance] == 0, "staked balance should be 0")
+        assert(stakerInfo[smap.rewardDebt] == 0, "rewardDebt should be correct")
+
+        assert(await tellor.totalRewardDebt() == expectedTotalRewardDebt, "totalRewardDebt should be correct")
+        
+        // withdraw 2nd stake
+        await tellor.connect(accounts[3]).requestStakingWithdraw(h.toWei("100"))
+        blocky4 = await h.getBlock()
+
+        expectedAccumulatedRewardPerShare = BigInt(blocky4.timestamp - blocky3.timestamp) * BigInt(expectedRewardRate) / BigInt(100) + BigInt(expectedAccumulatedRewardPerShare)
+        assert(await tellor.accumulatedRewardPerShare() == expectedAccumulatedRewardPerShare, "accumulatedRewardPerShare should be correct")
+
+        expectedStakerBalance2 = BigInt(100) * BigInt(expectedAccumulatedRewardPerShare) - expectedRewardDebt
+        assert(await token.balanceOf(accounts[3].address) == expectedStakerBalance2, "staker balance should be correct")
+        stakerInfo = await tellor.getStakerInfo(accounts[3].address)
+        assert(stakerInfo[smap.stakedBalance] == 0, "staked balance should be 0")
+        assert(stakerInfo[smap.rewardDebt] == 0, "rewardDebt should be correct")
+
+        assert(await tellor.totalRewardDebt() == 0, "totalRewardDebt should be correct")
+
+        await h.advanceTime(86400 * 7)
+
+        // fully withdraw both stakes
+        await tellor.connect(accounts[2]).withdrawStake()
+        await tellor.connect(accounts[3]).withdrawStake()
+
+        expectedStakerBalance1 += BigInt(h.toWei("100"))
+        assert(await token.balanceOf(accounts[2].address) == expectedStakerBalance1, "staker balance should be correct")
+        expectedStakerBalance2 += BigInt(h.toWei("100"))
+        assert(await token.balanceOf(accounts[3].address) == expectedStakerBalance2, "staker balance should be correct")
     })
 })

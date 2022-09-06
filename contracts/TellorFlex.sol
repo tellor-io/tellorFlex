@@ -29,7 +29,6 @@ contract TellorFlex {
     uint256 public totalRewardDebt; // staking reward debt, used to calculate real staking rewards balance
     uint256 public totalStakeAmount; // total amount of tokens locked in contract (via stake)
     uint256 public totalStakers; // total number of stakers with at least stakeAmount staked, not exact
-    uint256 public totalTimeBasedRewardsBalance; // amount of TBR deposited into Tellor Flex
 
     mapping(bytes32 => Report) private reports; // mapping of query IDs to a report
     mapping(address => StakeInfo) private stakerDetails; // mapping from a persons address to their staking info
@@ -309,7 +308,7 @@ contract TellorFlex {
         uint256 _totalTimeBasedRewardsBalance =
             token.balanceOf(address(this)) -
             (totalStakeAmount + stakingRewardsBalance);
-        if (_reward > 0 && _totalTimeBasedRewardsBalance > 0) {
+        if (_totalTimeBasedRewardsBalance > 0 && _reward > 0) {
             if (_totalTimeBasedRewardsBalance < _reward) {
                 token.transfer(msg.sender, _totalTimeBasedRewardsBalance);
             } else {
@@ -349,15 +348,6 @@ contract TellorFlex {
             stakeAmount = (stakeAmountDollarTarget * 1e18) / _stakingTokenPrice;
             emit NewStakeAmount(stakeAmount);
         }
-    }
-
-    /**
-     * @dev Updates the time based rewards balance
-     */
-    function updateTotalTimeBasedRewardsBalance() external {
-        totalTimeBasedRewardsBalance =
-            token.balanceOf(address(this)) -
-            (totalStakeAmount + stakingRewardsBalance);
     }
 
     /**
