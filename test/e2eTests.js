@@ -538,5 +538,27 @@ describe("TellorFlex - e2e Tests", function () {
         await tellor.connect(accounts[1]).depositStake(h.toWei("1"))
         tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x')
     })
+
+    it("what happens to staking rewards of non-voter?", async function() {
+        // Setup
+        await token.mint(accounts[1].address, h.toWei("100"))
+        await token.mint(accounts[2].address, h.toWei("100"))
+        await token.mint(accounts[10].address, h.toWei("1000"))
+        await token.connect(accounts[1]).approve(tellor.address, h.toWei("100"))
+        await token.connect(accounts[2]).approve(tellor.address, h.toWei("100"))
+        await token.connect(accounts[10]).approve(tellor.address, h.toWei("1000"))
+        await tellor.connect(accounts[1]).depositStake(h.toWei("100"))
+        await tellor.connect(accounts[10]).addStakingRewards(h.toWei("1000"))
+
+        await h.advanceTime(1)
+        await governance.beginDisputeMock()
+        await tellor.connect(accounts[2]).depositStake(h.toWei("100"))
+        await tellor.connect(accounts[1]).requestStakingWithdraw(h.toWei("100"))
+        await h.advanceTime(86400 * 40)
+
+        await tellor.connect(accounts[2]).depositStake(0)
+        balanceStaker2 = await token.balanceOf(accounts[2].address)
+        assert(balanceStaker2 == h.toWei("1000"), "staker 2 should have 1000 TRB")
+    })
     
 })
