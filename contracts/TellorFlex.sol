@@ -937,6 +937,16 @@ contract TellorFlex {
             1e18;
         totalRewardDebt += _staker.rewardDebt;
         totalStakeAmount += _staker.stakedBalance;
+        // update reward rate if staking rewards are available 
+        // given staker's updated parameters
+        if(rewardRate == 0) {
+            rewardRate =
+            (stakingRewardsBalance -
+                ((accumulatedRewardPerShare * totalStakeAmount) /
+                    1e18 -
+                    totalRewardDebt)) /
+            30 days;
+        }
     }
 
     /**

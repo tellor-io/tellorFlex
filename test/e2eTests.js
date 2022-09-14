@@ -5,6 +5,7 @@ var assert = require('assert');
 const web3 = require('web3');
 const { prependOnceListener } = require("process");
 const { stakeAmount } = require("./helpers/helpers");
+const helpers = require("./helpers/helpers");
 const BN = ethers.BigNumber.from
 
 describe("TellorFlex - e2e Tests", function () {
@@ -538,5 +539,109 @@ describe("TellorFlex - e2e Tests", function () {
         await tellor.connect(accounts[1]).depositStake(h.toWei("1"))
         tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x')
     })
+
+    it("what happens to staking rewards of non-voter?", async function() {
+        // Setup
+        await token.mint(accounts[1].address, h.toWei("100"))
+        await token.mint(accounts[2].address, h.toWei("100"))
+        await token.mint(accounts[10].address, h.toWei("1000"))
+        await token.connect(accounts[1]).approve(tellor.address, h.toWei("1000000"))
+        await token.connect(accounts[2]).approve(tellor.address, h.toWei("100"))
+        await token.connect(accounts[10]).approve(tellor.address, h.toWei("1000"))
+
+        await tellor.connect(accounts[1]).depositStake(h.toWei("100"))
+        await tellor.connect(accounts[10]).addStakingRewards(h.toWei("1000"))
+
+        await h.advanceTime(1)
+
+        await governance.beginDisputeMock()
+        await tellor.connect(accounts[2]).depositStake(h.toWei("100"))
+
+        await h.advanceTime(86400 * 40)
+
+        await tellor.connect(accounts[1]).requestStakingWithdraw(h.toWei("100"))
+
+        await h.advanceTime(86400 * 40)
+
+        await tellor.connect(accounts[2]).depositStake(0)
+        balanceStaker2 = await token.balanceOf(accounts[2].address)
+        assert(balanceStaker2 == h.toWei("1000"), "staker 2 should have 1000 TRB")
+    })
+
+    it("rewards go to zero, big reward added, staker stakes", async function() {
+        // Setup
+        await token.mint(accounts[1].address, h.toWei("100"))
+        await token.mint(accounts[2].address, h.toWei("100"))
+        await token.mint(accounts[3].address, h.toWei("100"))
+        await token.mint(accounts[4].address, h.toWei("100"))
+        await token.mint(accounts[10].address, h.toWei("5000"))
+        await token.connect(accounts[1]).approve(tellor.address, h.toWei("1000000"))
+        await token.connect(accounts[2]).approve(tellor.address, h.toWei("100"))
+        await token.connect(accounts[3]).approve(tellor.address, h.toWei("100"))
+        await token.connect(accounts[4]).approve(tellor.address, h.toWei("100"))
+        await token.connect(accounts[10]).approve(tellor.address, h.toWei("100000"))
+
+        await tellor.connect(accounts[1]).depositStake(h.toWei("100"))
+        await tellor.connect(accounts[10]).addStakingRewards(h.toWei("1000"))
+
+        await h.advanceTime(1)
+
+        await governance.beginDisputeMock()
+        await tellor.connect(accounts[2]).depositStake(h.toWei("100"))
+
+        await h.advanceTime(86400 * 40)
+
+        await tellor.connect(accounts[1]).requestStakingWithdraw(h.toWei("100"))
+
+        await h.advanceTime(86400 * 40)
+
+        await tellor.connect(accounts[2]).requestStakingWithdraw(h.toWei("100"))
+        balanceStaker2 = await token.balanceOf(accounts[2].address)
+        assert(balanceStaker2 == h.toWei("1000"), "staker 2 should have 1000 TRB")
+
+        assert(await tellor.rewardRate() == 0, "reward rate should be 0")
+
+        await tellor.connect(accounts[10]).addStakingRewards(h.toWei("3000"))
+        await tellor.connect(accounts[3]).depositStake(h.toWei("100"))
+        balanceStaker3 = await token.balanceOf(accounts[3].address)
+        assert(balanceStaker3 == h.toWei("0"), "staker 3 should have 0 TRB")
+
+        await h.advanceTime(86400 * 10)
+        await tellor.connect(accounts[3]).depositStake(0)
+        balanceStaker3 = await token.balanceOf(accounts[3].address)
+        expectedBalMin3 = BigInt(h.toWei("3000")) * BigInt(9) / BigInt(30) 
+        expectedBalMax3 = BigInt(h.toWei("3000")) * BigInt(11) / BigInt(30) 
+        assert(balanceStaker3 > expectedBalMin3, "staker 3 should have min TRB")
+        assert(balanceStaker3 < expectedBalMax3, "staker 3 should have max TRB")
+
+        await h.advanceTime(86400)
+
+        await tellor.connect(accounts[4]).depositStake(h.toWei("100"))
+        balanceStaker4 = await token.balanceOf(accounts[4].address)
+        assert(balanceStaker4 == h.toWei("0"), "staker 4 should have 0 TRB")
+
+        await h.advanceTime(86400 * 50)
+
+        await tellor.connect(accounts[3]).depositStake(0)
+        await tellor.connect(accounts[4]).depositStake(0)
+
+        balanceStaker3 = await token.balanceOf(accounts[3].address)
+        balanceStaker4 = await token.balanceOf(accounts[4].address)
+
+        expectedBalMin4 = BigInt(h.toWei("3000")) * BigInt(9) / BigInt(30) 
+        expectedBalMax4 = BigInt(h.toWei("3000")) * BigInt(11) / BigInt(30) 
+        assert(balanceStaker4 > expectedBalMin4, "staker 4 should have min TRB")
+        assert(balanceStaker4 < expectedBalMax4, "staker 4 should have max TRB")
+
+        expectedBalMin3 += expectedBalMin4
+        expectedBalMax3 += expectedBalMax4
+        assert(balanceStaker3 > expectedBalMin3, "staker 3 should have min TRB")
+        assert(balanceStaker3 < expectedBalMax3, "staker 3 should have max TRB")
+
+        assert(BigInt(balanceStaker3) + BigInt(balanceStaker4) == h.toWei("3000"), "stakers should have 3000 TRB")
+        assert(await tellor.rewardRate() == 0, "reward rate should be 0")
+    })
+
+    
     
 })
