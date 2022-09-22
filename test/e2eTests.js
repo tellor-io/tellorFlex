@@ -25,6 +25,9 @@ describe("TellorFlex - e2e Tests", function () {
     const TRB_QUERY_DATA_ARGS = abiCoder.encode(["string", "string"], ["trb", "usd"])
     const TRB_QUERY_DATA = abiCoder.encode(["string", "bytes"], ["SpotPrice", TRB_QUERY_DATA_ARGS])
     const TRB_QUERY_ID = ethers.utils.keccak256(TRB_QUERY_DATA)
+    const ETH_QUERY_DATA_ARGS = abiCoder.encode(["string", "string"], ["eth", "usd"])
+    const ETH_QUERY_DATA = abiCoder.encode(["string", "bytes"], ["SpotPrice", ETH_QUERY_DATA_ARGS])
+    const ETH_QUERY_ID = ethers.utils.keccak256(ETH_QUERY_DATA)
     const smap = {
         startDate: 0,
         stakedBalance: 1,
@@ -65,15 +68,15 @@ describe("TellorFlex - e2e Tests", function () {
     });
     it("Staked multiple times, disputed but keeps reporting", async function () {
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("30"))
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
+        await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
         let blocky = await h.getBlock()
-        expect(await tellor.getNewValueCountbyQueryId(h.uintTob32(1))).to.equal(1)
-        expect(await tellor.retrieveData(h.uintTob32(1), blocky.timestamp)).to.equal(h.bytes(100))
-        await h.expectThrow(tellor.connect(accounts[1]).removeValue(h.uintTob32(1), blocky.timestamp)) // only gov can removeValue
-        await tellor.connect(govSigner).removeValue(h.uintTob32(1), blocky.timestamp)
+        expect(await tellor.getNewValueCountbyQueryId(ETH_QUERY_ID)).to.equal(1)
+        expect(await tellor.retrieveData(ETH_QUERY_ID, blocky.timestamp)).to.equal(h.bytes(100))
+        await h.expectThrow(tellor.connect(accounts[1]).removeValue(ETH_QUERY_ID, blocky.timestamp)) // only gov can removeValue
+        await tellor.connect(govSigner).removeValue(ETH_QUERY_ID, blocky.timestamp)
         await tellor.connect(govSigner).slashReporter(accounts[1].address, accounts[2].address)
         await h.advanceTime(86400 / 2 / 3)
-        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x'))
+        await h.expectThrow(tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA))
         await h.advanceTime(86400 / 2 / 3)
         let vars = await tellor.getStakerInfo(accounts[1].address)
         assert(vars[1] == web3.utils.toWei("20"), "should still have money staked")
@@ -82,16 +85,16 @@ describe("TellorFlex - e2e Tests", function () {
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
+        await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
         let vars = await tellor.getStakerInfo(accounts[1].address)
         assert(vars[1] == web3.utils.toWei("30"), "should still have money staked")
     })
     it("Bad value placed, withdraw requested, dispute started", async function () {
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("120"))
-        await tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(4000), 0, '0x')
+        await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
         let blocky = await h.getBlock()
         await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("10"))
-        await tellor.connect(govSigner).removeValue(h.uintTob32(1), blocky.timestamp)
+        await tellor.connect(govSigner).removeValue(ETH_QUERY_ID, blocky.timestamp)
         await tellor.connect(govSigner).slashReporter(accounts[1].address, accounts[2].address)
         await h.expectThrow(tellor.connect(accounts[1]).withdrawStake()) // 7 days didn't pass
     })
@@ -102,12 +105,16 @@ describe("TellorFlex - e2e Tests", function () {
         await tellor.connect(accounts[2]).depositStake(web3.utils.toWei("10"))
         let count
         for (i = 0; i < 50; i++) {
-            await tellor.connect(accounts[1]).submitValue(h.uintTob32(i + 1), h.bytes(100), 0, i)
-            await tellor.connect(accounts[2]).submitValue(h.uintTob32(i + 1), h.bytes(100), 0, i)
+            queryData = h.uintTob32(i + 1)
+            queryId = ethers.utils.keccak256(queryData)
+            await tellor.connect(accounts[1]).submitValue(queryId, h.bytes(100), 0, queryData)
+            await tellor.connect(accounts[2]).submitValue(queryId, h.bytes(100), 0, queryData)
             await h.advanceTime(86400 / 2)
         }
         for (i = 0; i < 50; i++) {
-            count = await tellor.getNewValueCountbyQueryId(h.uintTob32(i + 1))
+            queryData = h.uintTob32(i + 1)
+            queryId = ethers.utils.keccak256(queryData)
+            count = await tellor.getNewValueCountbyQueryId(queryId)
             assert(count == 2, "new value count should be correct")
         }
         let repC1 = await tellor.getReportsSubmittedByAddress(accounts[1].address)
@@ -123,15 +130,15 @@ describe("TellorFlex - e2e Tests", function () {
         }
         for (i = 0; i < 10; i++) {
             await h.advanceTime(86400 / 2)
-            await tellor.connect(accounts[i]).submitValue(h.uintTob32(1), h.bytes(100), 0, "0x")
-            await tellor.connect(accounts[i + 1]).submitValue(h.uintTob32(1), h.bytes(200), 0, "0x")
-            await tellor.connect(accounts[i + 2]).submitValue(h.uintTob32(1), h.bytes(100), 0, "0x")
-            await tellor.connect(accounts[i + 3]).submitValue(h.uintTob32(1), h.bytes(100), 0, "0x")
-            await tellor.connect(accounts[i + 4]).submitValue(h.uintTob32(1), h.bytes(100), 0, "0x")
+            await tellor.connect(accounts[i]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
+            await tellor.connect(accounts[i + 1]).submitValue(ETH_QUERY_ID, h.bytes(200), 0, ETH_QUERY_DATA)
+            await tellor.connect(accounts[i + 2]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
+            await tellor.connect(accounts[i + 3]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
+            await tellor.connect(accounts[i + 4]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
 
         }
         let blocky = await h.getBlock()
-        await tellor.connect(govSigner).removeValue(h.uintTob32(1), blocky.timestamp)
+        await tellor.connect(govSigner).removeValue(ETH_QUERY_ID, blocky.timestamp)
         await tellor.connect(govSigner).slashReporter(accounts[13].address, accounts[2].address)
         // await tellor.connect(govSigner).changeGovernanceAddress(accounts[1].address)
         for (i = 1; i < 3; i++) {
@@ -140,8 +147,8 @@ describe("TellorFlex - e2e Tests", function () {
             await tellor.connect(accounts[i]).withdrawStake()
         }
         for (i = 3; i < 8; i++) {
-            await tellor.connect(accounts[i]).submitValue(h.uintTob32(1), h.bytes(100), 0, "0x")
-            await tellor.connect(accounts[i + 1]).submitValue(h.uintTob32(1), h.bytes(10000), 0, "0x")
+            await tellor.connect(accounts[i]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
+            await tellor.connect(accounts[i + 1]).submitValue(ETH_QUERY_ID, h.bytes(10000), 0, ETH_QUERY_DATA)
             await h.advanceTime(86400 / 2)
         }
     })
@@ -310,7 +317,7 @@ describe("TellorFlex - e2e Tests", function () {
 
         //submit value should not disperse TBR because
         // 0 time based rewards tokens deposited
-        await tellor.connect(accounts[0]).submitValue(h.uintTob32(1), h.bytes(100), 0, '0x')
+        await tellor.connect(accounts[0]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
 
         //TRB balance of flex should be 160 TRB
         expect(
@@ -525,19 +532,19 @@ describe("TellorFlex - e2e Tests", function () {
         await tellor.connect(accounts[1]).depositStake(h.toWei("9"))
 
         // ensure can't submit value with less than one stake
-        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x'))
+        await h.expectThrow(tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.uintTob32(1000), 0, ETH_QUERY_DATA))
 
         // stake a single stake amount
         await tellor.connect(accounts[1]).depositStake(h.toWei("1"))
-        tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x')
+        tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.uintTob32(1000), 0, ETH_QUERY_DATA)
 
-        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x'))
+        await h.expectThrow(tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.uintTob32(1000), 0, ETH_QUERY_DATA))
         await tellor.connect(accounts[1]).depositStake(h.toWei("9"))
         await h.advanceTime(60 * 60 * 6)
 
-        await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x'))
+        await h.expectThrow(tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.uintTob32(1000), 0, ETH_QUERY_DATA))
         await tellor.connect(accounts[1]).depositStake(h.toWei("1"))
-        tellor.connect(accounts[1]).submitValue(h.uintTob32(1), h.uintTob32(1000), 0, '0x')
+        tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.uintTob32(1000), 0, ETH_QUERY_DATA)
     })
 
     it("what happens to staking rewards of non-voter?", async function() {
