@@ -24,6 +24,12 @@ describe("TellorFlex - Function Tests", function () {
 	const TRB_QUERY_DATA_ARGS = abiCoder.encode(["string", "string"], ["trb", "usd"])
 	const TRB_QUERY_DATA = abiCoder.encode(["string", "bytes"], ["SpotPrice", TRB_QUERY_DATA_ARGS])
 	const TRB_QUERY_ID = ethers.utils.keccak256(TRB_QUERY_DATA)
+	const ETH_QUERY_DATA_ARGS = abiCoder.encode(["string", "string"], ["eth", "usd"])
+    const ETH_QUERY_DATA = abiCoder.encode(["string", "bytes"], ["SpotPrice", ETH_QUERY_DATA_ARGS])
+    const ETH_QUERY_ID = ethers.utils.keccak256(ETH_QUERY_DATA)
+	const BTC_QUERY_DATA_ARGS = abiCoder.encode(["string", "string"], ["btc", "usd"])
+	const BTC_QUERY_DATA = abiCoder.encode(["string", "bytes"], ["SpotPrice", BTC_QUERY_DATA_ARGS])
+	const BTC_QUERY_ID = ethers.utils.keccak256(BTC_QUERY_DATA)
 	const smap = {
 		startDate: 0,
 		stakedBalance: 1,
@@ -120,25 +126,25 @@ describe("TellorFlex - Function Tests", function () {
 	it("removeValue", async function () {
 		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
 		await tellor.connect(accounts[1]).depositStake(REQUIRED_STAKE)
-		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+		await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
 		let blocky = await h.getBlock()
 
-		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(1)
-		await h.expectThrow(tellor.connect(govSigner).removeValue(QUERYID1, 500)) // invalid value
-		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.bytes(100))
-		await h.expectThrow(tellor.connect(accounts[1]).removeValue(QUERYID1, blocky.timestamp)) // test require: only gov can removeValue
-		expect(await tellor.isInDispute(QUERYID1, blocky.timestamp)).to.be.false
-		await tellor.connect(govSigner).removeValue(QUERYID1, blocky.timestamp)
-		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(1)
-		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal("0x")
-		expect(await tellor.isInDispute(QUERYID1, blocky.timestamp)).to.be.true
-		await h.expectThrow(tellor.connect(govSigner).removeValue(QUERYID1, blocky.timestamp)) // test require: value already disputed
+		expect(await tellor.getNewValueCountbyQueryId(ETH_QUERY_ID)).to.equal(1)
+		await h.expectThrow(tellor.connect(govSigner).removeValue(ETH_QUERY_ID, 500)) // invalid value
+		expect(await tellor.retrieveData(ETH_QUERY_ID, blocky.timestamp)).to.equal(h.bytes(100))
+		await h.expectThrow(tellor.connect(accounts[1]).removeValue(ETH_QUERY_ID, blocky.timestamp)) // test require: only gov can removeValue
+		expect(await tellor.isInDispute(ETH_QUERY_ID, blocky.timestamp)).to.be.false
+		await tellor.connect(govSigner).removeValue(ETH_QUERY_ID, blocky.timestamp)
+		expect(await tellor.getNewValueCountbyQueryId(ETH_QUERY_ID)).to.equal(1)
+		expect(await tellor.retrieveData(ETH_QUERY_ID, blocky.timestamp)).to.equal("0x")
+		expect(await tellor.isInDispute(ETH_QUERY_ID, blocky.timestamp)).to.be.true
+		await h.expectThrow(tellor.connect(govSigner).removeValue(ETH_QUERY_ID, blocky.timestamp)) // test require: value already disputed
 
 		// Test min/max values for _timestamp argument
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100), 0, '0x')
-		await expect(tellor.connect(govSigner).removeValue(QUERYID2, 0)).to.be.revertedWith("invalid timestamp")
-		await expect(tellor.connect(govSigner).removeValue(QUERYID2, ethers.constants.MaxUint256)).to.be.revertedWith("invalid timestamp")
+		await tellor.connect(accounts[1]).submitValue(BTC_QUERY_ID, h.bytes(100), 0, BTC_QUERY_DATA)
+		await expect(tellor.connect(govSigner).removeValue(BTC_QUERY_ID, 0)).to.be.revertedWith("invalid timestamp")
+		await expect(tellor.connect(govSigner).removeValue(BTC_QUERY_ID, ethers.constants.MaxUint256)).to.be.revertedWith("invalid timestamp")
 	})
 
 	it("requestStakingWithdraw", async function () {
@@ -266,45 +272,45 @@ describe("TellorFlex - Function Tests", function () {
 
 	it("submitValue", async function () {
 		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("120"))
-		await h.expectThrow(tellor.connect(accounts[1]).submitValue(QUERYID1,'0x', 0, '0x')) //must submit a value
-		await h.expectThrow(tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4000), 1, '0x')) // test require: wrong nonce
-		await h.expectThrow(tellor.connect(accounts[2]).submitValue(QUERYID1, h.uintTob32(4000), 1, '0x')) // test require: insufficient staked balance
-		await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(101), h.uintTob32(4000), 0, '0x')) // test require: non-legacy queryId must equal hash(queryData)
-		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
-		await h.expectThrow(tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4000), 1, '0x')) // test require: still in reporting lock
+		await h.expectThrow(tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID,'0x', 0, ETH_QUERY_DATA)) //must submit a value
+		await h.expectThrow(tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.uintTob32(4000), 1, ETH_QUERY_DATA)) // test require: wrong nonce
+		await h.expectThrow(tellor.connect(accounts[2]).submitValue(ETH_QUERY_ID, h.uintTob32(4000), 1, ETH_QUERY_DATA)) // test require: insufficient staked balance
+		await h.expectThrow(tellor.connect(accounts[1]).submitValue(h.uintTob32(101), h.uintTob32(4000), 0, ETH_QUERY_DATA)) // test require: non-legacy queryId must equal hash(queryData)
+		await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
+		await h.expectThrow(tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.uintTob32(4000), 1, ETH_QUERY_DATA)) // test require: still in reporting lock
 
 		await h.advanceTime(3600) // 1 hour
-		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4001), 1, '0x')
+		await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.uintTob32(4001), 1, ETH_QUERY_DATA)
 		blocky = await h.getBlock()
-		expect(await tellor.getTimestampIndexByTimestamp(QUERYID1, blocky.timestamp)).to.equal(1)
-		expect(await tellor.getTimestampbyQueryIdandIndex(QUERYID1, 1)).to.equal(blocky.timestamp)
-		expect(await tellor.getBlockNumberByTimestamp(QUERYID1, blocky.timestamp)).to.equal(blocky.number)
-		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.uintTob32(4001))
-		expect(await tellor.getReporterByTimestamp(QUERYID1, blocky.timestamp)).to.equal(accounts[1].address)
+		expect(await tellor.getTimestampIndexByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(1)
+		expect(await tellor.getTimestampbyQueryIdandIndex(ETH_QUERY_ID, 1)).to.equal(blocky.timestamp)
+		expect(await tellor.getBlockNumberByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(blocky.number)
+		expect(await tellor.retrieveData(ETH_QUERY_ID, blocky.timestamp)).to.equal(h.uintTob32(4001))
+		expect(await tellor.getReporterByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(accounts[1].address)
 		expect(await tellor.timeOfLastNewValue()).to.equal(blocky.timestamp)
 		expect(await tellor.getReportsSubmittedByAddress(accounts[1].address)).to.equal(2)
-		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, QUERYID1)).to.equal(2)
+		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, ETH_QUERY_ID)).to.equal(2)
 
 		// Test submit multiple identical values w/ min _nonce
 		await token.mint(accounts[2].address, h.toWei("120"))
 		await token.connect(accounts[2]).approve(tellor.address, h.toWei("120"))
 		await tellor.connect(accounts[2]).depositStake(web3.utils.toWei("120"))
-		await tellor.connect(accounts[2]).submitValue(QUERYID1, h.uintTob32(4001), 0, '0x')
+		await tellor.connect(accounts[2]).submitValue(ETH_QUERY_ID, h.uintTob32(4001), 0, ETH_QUERY_DATA)
 		await h.advanceTime(3600)
-		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4001), 0, '0x')
+		await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.uintTob32(4001), 0, ETH_QUERY_DATA)
 		blocky = await h.getBlock()
-		expect(await tellor.getTimestampIndexByTimestamp(QUERYID1, blocky.timestamp)).to.equal(3)
-		expect(await tellor.getTimestampbyQueryIdandIndex(QUERYID1, 3)).to.equal(blocky.timestamp)
-		expect(await tellor.getBlockNumberByTimestamp(QUERYID1, blocky.timestamp)).to.equal(blocky.number)
-		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.uintTob32(4001))
-		expect(await tellor.getReporterByTimestamp(QUERYID1, blocky.timestamp)).to.equal(accounts[1].address)
+		expect(await tellor.getTimestampIndexByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(3)
+		expect(await tellor.getTimestampbyQueryIdandIndex(ETH_QUERY_ID, 3)).to.equal(blocky.timestamp)
+		expect(await tellor.getBlockNumberByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(blocky.number)
+		expect(await tellor.retrieveData(ETH_QUERY_ID, blocky.timestamp)).to.equal(h.uintTob32(4001))
+		expect(await tellor.getReporterByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(accounts[1].address)
 		expect(await tellor.timeOfLastNewValue()).to.equal(blocky.timestamp)
 		expect(await tellor.getReportsSubmittedByAddress(accounts[1].address)).to.equal(3)
-		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, QUERYID1)).to.equal(3)
+		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, ETH_QUERY_ID)).to.equal(3)
 
 		// Test max val for _nonce
 		await h.advanceTime(3600)
-		await expect(tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4001), ethers.constants.MaxUint256, '0x')).to.be.revertedWith("nonce must match timestamp index")
+		await expect(tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.uintTob32(4001), ethers.constants.MaxUint256, ETH_QUERY_DATA)).to.be.revertedWith("nonce must match timestamp index")
 
 	})
 
@@ -332,16 +338,16 @@ describe("TellorFlex - Function Tests", function () {
 
 	it("getBlockNumberByTimestamp", async function () {
 		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("100"))
-		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		blocky = await h.getBlock()
-		expect(await tellor.getBlockNumberByTimestamp(QUERYID1, blocky.timestamp)).to.equal(blocky.number)
+		expect(await tellor.getBlockNumberByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(blocky.number)
 	})
 
 	it("getCurrentValue", async function () {
 		tellor = await tellor.connect(accounts[1])
 		await tellor.depositStake(web3.utils.toWei("100"))
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
-		expect(await tellor.getCurrentValue(QUERYID1)).to.equal(h.uintTob32(4000))
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
+		expect(await tellor.getCurrentValue(ETH_QUERY_ID)).to.equal(h.uintTob32(4000))
 	})
 
 	it("getGovernanceAddress", async function () {
@@ -351,31 +357,31 @@ describe("TellorFlex - Function Tests", function () {
 	it("getNewValueCountbyQueryId", async function () {
 		tellor = await tellor.connect(accounts[1])
 		await tellor.depositStake(web3.utils.toWei("100"))
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
-		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(2)
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
+		expect(await tellor.getNewValueCountbyQueryId(ETH_QUERY_ID)).to.equal(2)
 	})
 
 	it("getReportDetails", async function () {
 		tellor = await tellor.connect(accounts[1])
 		await tellor.depositStake(web3.utils.toWei("100"))
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		blocky1 = await h.getBlock()
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.submitValue(QUERYID1, h.uintTob32(4001), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4001), 0, ETH_QUERY_DATA)
 		blocky2 = await h.getBlock()
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.submitValue(QUERYID1, h.uintTob32(4002), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4002), 0, ETH_QUERY_DATA)
 		blocky3 = await h.getBlock()
-		await tellor.connect(govSigner).removeValue(QUERYID1, blocky3.timestamp)
-		reportDetails = await tellor.getReportDetails(QUERYID1, blocky1.timestamp)
+		await tellor.connect(govSigner).removeValue(ETH_QUERY_ID, blocky3.timestamp)
+		reportDetails = await tellor.getReportDetails(ETH_QUERY_ID, blocky1.timestamp)
 		expect(reportDetails[0]).to.equal(accounts[1].address)
 		expect(reportDetails[1]).to.equal(false)
-		reportDetails = await tellor.getReportDetails(QUERYID1, blocky2.timestamp)
+		reportDetails = await tellor.getReportDetails(ETH_QUERY_ID, blocky2.timestamp)
 		expect(reportDetails[0]).to.equal(accounts[1].address)
 		expect(reportDetails[1]).to.equal(false)
-		reportDetails = await tellor.getReportDetails(QUERYID1, blocky3.timestamp)
+		reportDetails = await tellor.getReportDetails(ETH_QUERY_ID, blocky3.timestamp)
 		expect(reportDetails[0]).to.equal(accounts[1].address)
 		expect(reportDetails[1]).to.equal(true)
 		reportDetails = await tellor.getReportDetails(h.uintTob32(2), blocky1.timestamp)
@@ -390,16 +396,16 @@ describe("TellorFlex - Function Tests", function () {
 	it("getReporterByTimestamp", async function () {
 		tellor = await tellor.connect(accounts[1])
 		await tellor.depositStake(web3.utils.toWei("100"))
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
-		expect(await tellor.getNewValueCountbyQueryId(QUERYID1)).to.equal(1)
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
+		expect(await tellor.getNewValueCountbyQueryId(ETH_QUERY_ID)).to.equal(1)
 	})
 
 	it("getReporterLastTimestamp", async function () {
 		tellor = await tellor.connect(accounts[1])
 		await tellor.depositStake(web3.utils.toWei("100"))
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		blocky = await h.getBlock()
 		expect(await tellor.getReporterLastTimestamp(accounts[1].address)).to.equal(blocky.timestamp)
 	})
@@ -407,9 +413,9 @@ describe("TellorFlex - Function Tests", function () {
 	it("getReportsSubmittedByAddress", async function () {
 		tellor = await tellor.connect(accounts[1])
 		await tellor.depositStake(web3.utils.toWei("100"))
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		blocky = await h.getBlock()
 		expect(await tellor.getReportsSubmittedByAddress(accounts[1].address)).to.equal(2)
 	})
@@ -417,11 +423,11 @@ describe("TellorFlex - Function Tests", function () {
 	it("getReportsSubmittedByAddressAndQueryId", async function () {
 		tellor = await tellor.connect(accounts[1])
 		await tellor.depositStake(web3.utils.toWei("100"))
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		blocky = await h.getBlock()
-		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, QUERYID1)).to.equal(2)
+		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, ETH_QUERY_ID)).to.equal(2)
 	})
 
 	it("getStakeAmount", async function () {
@@ -433,7 +439,7 @@ describe("TellorFlex - Function Tests", function () {
 		await tellor.depositStake(h.toWei("100"))
 		await tellor.requestStakingWithdraw(h.toWei("10"))
 		blocky = await h.getBlock()
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		blocky2 = await h.getBlock()
 		stakerDetails = await tellor.getStakerInfo(accounts[1].address)
 		expect(stakerDetails[smap.startDate]).to.equal(blocky.timestamp)
@@ -449,9 +455,9 @@ describe("TellorFlex - Function Tests", function () {
 	it("getTimeOfLastNewValue", async function () {
 		tellor = await tellor.connect(accounts[1])
 		await tellor.depositStake(web3.utils.toWei("100"))
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		blocky = await h.getBlock()
 		expect(await tellor.getTimeOfLastNewValue()).to.equal(blocky.timestamp)
 	})
@@ -459,21 +465,21 @@ describe("TellorFlex - Function Tests", function () {
 	it("getTimestampbyQueryIdandIndex", async function () {
 		tellor = await tellor.connect(accounts[1])
 		await tellor.depositStake(web3.utils.toWei("100"))
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		blocky = await h.getBlock()
-		expect(await tellor.getTimestampbyQueryIdandIndex(QUERYID1, 1)).to.equal(blocky.timestamp)
+		expect(await tellor.getTimestampbyQueryIdandIndex(ETH_QUERY_ID, 1)).to.equal(blocky.timestamp)
 	})
 
 	it("getTimestampIndexByTimestamp", async function () {
 		tellor = await tellor.connect(accounts[1])
 		await tellor.depositStake(web3.utils.toWei("100"))
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		blocky = await h.getBlock()
-		expect(await tellor.getTimestampIndexByTimestamp(QUERYID1, blocky.timestamp)).to.equal(1)
+		expect(await tellor.getTimestampIndexByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(1)
 	})
 
 	it("getTotalStakeAmount", async function () {
@@ -507,15 +513,15 @@ describe("TellorFlex - Function Tests", function () {
 	it("retrieveData", async function () {
 		tellor = await tellor.connect(accounts[1])
 		await tellor.depositStake(web3.utils.toWei("100"))
-		await tellor.submitValue(QUERYID1, h.uintTob32(4000), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.submitValue(QUERYID1, h.uintTob32(4001), 0, '0x')
+		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4001), 0, ETH_QUERY_DATA)
 		blocky = await h.getBlock()
-		expect(await tellor.retrieveData(QUERYID1, blocky.timestamp)).to.equal(h.uintTob32(4001))
+		expect(await tellor.retrieveData(ETH_QUERY_ID, blocky.timestamp)).to.equal(h.uintTob32(4001))
 
 		// Test max/min values for _timestamp arg
-		expect(await tellor.retrieveData(QUERYID1, 0)).to.equal(ethers.utils.hexlify("0x"))
-		expect(await tellor.retrieveData(QUERYID1, ethers.constants.MaxUint256)).to.equal(ethers.utils.hexlify("0x"))
+		expect(await tellor.retrieveData(ETH_QUERY_ID, 0)).to.equal(ethers.utils.hexlify("0x"))
+		expect(await tellor.retrieveData(ETH_QUERY_ID, ethers.constants.MaxUint256)).to.equal(ethers.utils.hexlify("0x"))
 	})
 
 	it("getTotalTimeBasedRewardsBalance", async function () {
@@ -581,103 +587,103 @@ describe("TellorFlex - Function Tests", function () {
 		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
 		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("1000"))
 
-		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100), 0, '0x')
+		await tellor.connect(accounts[1]).submitValue(BTC_QUERY_ID, h.bytes(100), 0, BTC_QUERY_DATA)
 		blocky0 = await h.getBlock()
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100), 1, '0x')
+		await tellor.connect(accounts[1]).submitValue(BTC_QUERY_ID, h.bytes(100), 1, BTC_QUERY_DATA)
 		blocky1 = await h.getBlock()
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100), 2, '0x')
+		await tellor.connect(accounts[1]).submitValue(BTC_QUERY_ID, h.bytes(100), 2, BTC_QUERY_DATA)
 		blocky2 = await h.getBlock()
 		
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp)
+		index = await tellor.getIndexForDataBefore(BTC_QUERY_ID, blocky2.timestamp)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
 
 		// advance time one year and test
 		await h.advanceTime(86400 * 365)
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp)
+		index = await tellor.getIndexForDataBefore(BTC_QUERY_ID, blocky2.timestamp)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
 
 		// advance time one year and test
 		await h.advanceTime(86400 * 365)
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp)
+		index = await tellor.getIndexForDataBefore(BTC_QUERY_ID, blocky2.timestamp)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
 
 		for(i = 0; i < 50; i++) {
 			await h.advanceTime(60 * 60 * 12)
-			await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100 + i), 0, '0x')
+			await tellor.connect(accounts[1]).submitValue(BTC_QUERY_ID, h.bytes(100 + i), 0, BTC_QUERY_DATA)
 		}
 		blocky52 = await h.getBlock()
 		
 		// test last value disputed
-		await tellor.connect(govSigner).removeValue(QUERYID2, blocky52.timestamp)
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky52.timestamp + 1)
+		await tellor.connect(govSigner).removeValue(BTC_QUERY_ID, blocky52.timestamp)
+		index = await tellor.getIndexForDataBefore(BTC_QUERY_ID, blocky52.timestamp + 1)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(51)
 
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp)
+		index = await tellor.getIndexForDataBefore(BTC_QUERY_ID, blocky2.timestamp)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
 
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp + 1)
+		index = await tellor.getIndexForDataBefore(BTC_QUERY_ID, blocky2.timestamp + 1)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(2)
 
 		// remove value at index 2
-		await tellor.connect(govSigner).removeValue(QUERYID2, blocky2.timestamp)
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp)
+		await tellor.connect(govSigner).removeValue(BTC_QUERY_ID, blocky2.timestamp)
+		index = await tellor.getIndexForDataBefore(BTC_QUERY_ID, blocky2.timestamp)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
 
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp + 1)
+		index = await tellor.getIndexForDataBefore(BTC_QUERY_ID, blocky2.timestamp + 1)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
 
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky1.timestamp + 1)
+		index = await tellor.getIndexForDataBefore(BTC_QUERY_ID, blocky1.timestamp + 1)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(1)
 
-		await tellor.connect(govSigner).removeValue(QUERYID2, blocky1.timestamp)
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp - 1)
+		await tellor.connect(govSigner).removeValue(BTC_QUERY_ID, blocky1.timestamp)
+		index = await tellor.getIndexForDataBefore(BTC_QUERY_ID, blocky2.timestamp - 1)
 		expect(index[0]).to.be.true
 		expect(index[1]).to.equal(0)
 
-		await tellor.connect(govSigner).removeValue(QUERYID2, blocky0.timestamp)
-		index = await tellor.getIndexForDataBefore(QUERYID2, blocky2.timestamp - 1)
+		await tellor.connect(govSigner).removeValue(BTC_QUERY_ID, blocky0.timestamp)
+		index = await tellor.getIndexForDataBefore(BTC_QUERY_ID, blocky2.timestamp - 1)
 		expect(index[0]).to.be.false
 		expect(index[1]).to.equal(0)
 
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+		await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
 		blocky0 = await h.getBlock()
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+		await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
 		blocky1 = await h.getBlock()
 
-		await tellor.connect(govSigner).removeValue(QUERYID1, blocky0.timestamp)
-		await tellor.connect(govSigner).removeValue(QUERYID1, blocky1.timestamp)
+		await tellor.connect(govSigner).removeValue(ETH_QUERY_ID, blocky0.timestamp)
+		await tellor.connect(govSigner).removeValue(ETH_QUERY_ID, blocky1.timestamp)
 
-		index = await tellor.getIndexForDataBefore(QUERYID1, blocky1.timestamp + 1)
+		index = await tellor.getIndexForDataBefore(ETH_QUERY_ID, blocky1.timestamp + 1)
 		expect(index[0]).to.be.false
 		expect(index[1]).to.equal(0)
 
-		index = await tellor.getIndexForDataBefore(QUERYID1, blocky0.timestamp + 1)
+		index = await tellor.getIndexForDataBefore(ETH_QUERY_ID, blocky0.timestamp + 1)
 		expect(index[0]).to.be.false
 		expect(index[1]).to.equal(0)
 
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+		await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
 		blocky2 = await h.getBlock()
 
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+		await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
 		// blocky3 = await h.getBlock()
 
-		await tellor.connect(govSigner).removeValue(QUERYID1, blocky2.timestamp)
-		index = await tellor.getIndexForDataBefore(QUERYID1, blocky2.timestamp + 1)
+		await tellor.connect(govSigner).removeValue(ETH_QUERY_ID, blocky2.timestamp)
+		index = await tellor.getIndexForDataBefore(ETH_QUERY_ID, blocky2.timestamp + 1)
 		expect(index[0]).to.be.false
 		expect(index[1]).to.equal(0)
 	})
@@ -688,56 +694,56 @@ describe("TellorFlex - Function Tests", function () {
 		await token.connect(accounts[1]).approve(tellor.address, web3.utils.toWei("1000"))
 		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("1000"))
 
-		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(150), 0, '0x')
+		await tellor.connect(accounts[1]).submitValue(BTC_QUERY_ID, h.bytes(150), 0, BTC_QUERY_DATA)
 		blocky1 = await h.getBlock()
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(160), 1, '0x')
+		await tellor.connect(accounts[1]).submitValue(BTC_QUERY_ID, h.bytes(160), 1, BTC_QUERY_DATA)
 		blocky2 = await h.getBlock()
 		await h.advanceTime(60 * 60 * 12)
-		await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(170), 2, '0x')
+		await tellor.connect(accounts[1]).submitValue(BTC_QUERY_ID, h.bytes(170), 2, BTC_QUERY_DATA)
 		blocky3 = await h.getBlock()
 
-		dataBefore = await tellor.getDataBefore(QUERYID2, blocky3.timestamp + 1)
+		dataBefore = await tellor.getDataBefore(BTC_QUERY_ID, blocky3.timestamp + 1)
 		expect(dataBefore[0])
 		expect(dataBefore[1]).to.equal(h.bytes(170))
 		expect(dataBefore[2]).to.equal(blocky3.timestamp)
 
-		dataBefore = await tellor.getDataBefore(QUERYID2, blocky2.timestamp)
+		dataBefore = await tellor.getDataBefore(BTC_QUERY_ID, blocky2.timestamp)
 		expect(dataBefore[0])
 		expect(dataBefore[1]).to.equal(h.bytes(150))
 		expect(dataBefore[2]).to.equal(blocky1.timestamp)
 
 		// advance time one year and test
 		await h.advanceTime(86400 * 365)
-		dataBefore = await tellor.getDataBefore(QUERYID2, blocky3.timestamp + 1)
+		dataBefore = await tellor.getDataBefore(BTC_QUERY_ID, blocky3.timestamp + 1)
 		expect(dataBefore[0])
 		expect(dataBefore[1]).to.equal(h.bytes(170))
 		expect(dataBefore[2]).to.equal(blocky3.timestamp)
 
 		// advance time one year and test
 		await h.advanceTime(86400 * 365)
-		dataBefore = await tellor.getDataBefore(QUERYID2, blocky3.timestamp + 1)
+		dataBefore = await tellor.getDataBefore(BTC_QUERY_ID, blocky3.timestamp + 1)
 		expect(dataBefore[0])
 		expect(dataBefore[1]).to.equal(h.bytes(170))
 		expect(dataBefore[2]).to.equal(blocky3.timestamp)
 
-		dataBefore = await tellor.getDataBefore(QUERYID2, blocky2.timestamp)
+		dataBefore = await tellor.getDataBefore(BTC_QUERY_ID, blocky2.timestamp)
 		expect(dataBefore[0])
 		expect(dataBefore[1]).to.equal(h.bytes(150))
 		expect(dataBefore[2]).to.equal(blocky1.timestamp)
 
 		// submit 50 values and test
 		for(i = 0; i < 50; i++) {
-			await tellor.connect(accounts[1]).submitValue(QUERYID2, h.bytes(100 + i), 0, '0x')
+			await tellor.connect(accounts[1]).submitValue(BTC_QUERY_ID, h.bytes(100 + i), 0, BTC_QUERY_DATA)
 			await h.advanceTime(60 * 60 * 12)
 		}
 
-		dataBefore = await tellor.getDataBefore(QUERYID2, blocky3.timestamp + 1)
+		dataBefore = await tellor.getDataBefore(BTC_QUERY_ID, blocky3.timestamp + 1)
 		expect(dataBefore[0])
 		expect(dataBefore[1]).to.equal(h.bytes(170))
 		expect(dataBefore[2]).to.equal(blocky3.timestamp)
 
-		dataBefore = await tellor.getDataBefore(QUERYID2, blocky2.timestamp)
+		dataBefore = await tellor.getDataBefore(BTC_QUERY_ID, blocky2.timestamp)
 		expect(dataBefore[0])
 		expect(dataBefore[1]).to.equal(h.bytes(150))
 		expect(dataBefore[2]).to.equal(blocky1.timestamp)

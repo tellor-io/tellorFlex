@@ -288,7 +288,7 @@ contract TellorFlex {
             "still in reporter time lock, please wait!"
         );
         require(
-            _queryId == keccak256(_queryData) || uint256(_queryId) <= 100,
+            _queryId == keccak256(_queryData),
             "query id must be hash of query data"
         );
         _staker.reporterLastTimestamp = block.timestamp;
