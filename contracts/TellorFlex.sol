@@ -17,6 +17,7 @@ contract TellorFlex {
     address public governance; // address with ability to remove values and slash reporters
     address public owner; // contract deployer, can call init function once
     uint256 public accumulatedRewardPerShare; // accumulated staking reward per staked token
+    uint256 public minimumStakeAmount; // minimum amount of tokens required to stake
     uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
     uint256 public rewardRate; // total staking rewards released per second
     uint256 public stakeAmount; // minimum amount required to be a staker
@@ -90,6 +91,7 @@ contract TellorFlex {
         uint256 _reportingLock,
         uint256 _stakeAmountDollarTarget,
         uint256 _stakingTokenPrice,
+        uint256 _minimumStakeAmount,
         bytes32 _stakingTokenPriceQueryId
     ) {
         require(_token != address(0), "must set token address");
@@ -100,7 +102,13 @@ contract TellorFlex {
         owner = msg.sender;
         reportingLock = _reportingLock;
         stakeAmountDollarTarget = _stakeAmountDollarTarget;
-        stakeAmount = (_stakeAmountDollarTarget * 1e18) / _stakingTokenPrice;
+        minimumStakeAmount = _minimumStakeAmount;
+        uint256 _potentialStakeAmount = (_stakeAmountDollarTarget * 1e18) / _stakingTokenPrice;
+        if(_potentialStakeAmount < _minimumStakeAmount) {
+            stakeAmount = _minimumStakeAmount;
+        } else {
+            stakeAmount = _potentialStakeAmount;
+        }
         stakingTokenPriceQueryId = _stakingTokenPriceQueryId;
     }
 
@@ -345,7 +353,13 @@ contract TellorFlex {
                 _stakingTokenPrice >= 0.01 ether && _stakingTokenPrice < 1000000 ether,
                 "invalid staking token price"
             );
-            stakeAmount = (stakeAmountDollarTarget * 1e18) / _stakingTokenPrice;
+
+            uint256 _adjustedStakeAmount = (stakeAmountDollarTarget * 1e18) / _stakingTokenPrice;
+            if(_adjustedStakeAmount < minimumStakeAmount) {
+                stakeAmount = minimumStakeAmount;
+            } else {
+                stakeAmount = _adjustedStakeAmount;
+            }
             emit NewStakeAmount(stakeAmount);
         }
     }

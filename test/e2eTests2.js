@@ -15,6 +15,7 @@ describe("TellorFlex - e2e Tests Two", function() {
 	let token;
 	let accounts;
     let owner;
+    const MINIMUM_STAKE_AMOUNT = web3.utils.toWei("100")
 	const STAKE_AMOUNT_USD_TARGET = h.toWei("500");
     const PRICE_TRB = h.toWei("50");
 	const REQUIRED_STAKE = h.toWei((parseInt(web3.utils.fromWei(STAKE_AMOUNT_USD_TARGET)) / parseInt(web3.utils.fromWei(PRICE_TRB))).toString());
@@ -50,7 +51,7 @@ describe("TellorFlex - e2e Tests Two", function() {
         governance = await Governance.deploy();
         await governance.deployed();
 		const TellorFlex = await ethers.getContractFactory("TellorFlex");
-		tellor = await TellorFlex.deploy(token.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB, TRB_QUERY_ID);
+		tellor = await TellorFlex.deploy(token.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB, MINIMUM_STAKE_AMOUNT, TRB_QUERY_ID);
         owner = await ethers.getSigner(await tellor.owner())
 		await tellor.deployed();
         await governance.setTellorAddress(tellor.address);
@@ -66,7 +67,7 @@ describe("TellorFlex - e2e Tests Two", function() {
         await tellor.connect(owner).init(governance.address)
 	});
     it("Staked multiple times, disputed but keeps reporting", async function() {
-        await tellor.connect(accounts[1]).depositStake(h.toWei("30"))
+        await tellor.connect(accounts[1]).depositStake(h.toWei("300"))
         await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
 		let blocky = await h.getBlock()
 		expect(await tellor.getNewValueCountbyQueryId(ETH_QUERY_ID)).to.equal(1)
@@ -78,7 +79,7 @@ describe("TellorFlex - e2e Tests Two", function() {
         await h.expectThrow(tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA))
         await h.advanceTime(86400/2/3)
         let vars = await tellor.getStakerInfo(accounts[1].address)
-        assert(vars[1] == h.toWei("20"), "should still have money staked")
+        assert(vars[1] == h.toWei("200"), "should still have money staked")
     })
     it("Realistic test with staking rewards and disputes", async function() {
         await token.mint(accounts[0].address, h.toWei("1000"))
