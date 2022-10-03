@@ -14,6 +14,7 @@ describe("TellorFlex - e2e Tests Three", function() {
 	let token;
 	let accounts;
     let owner;
+    const MINIMUM_STAKE_AMOUNT = web3.utils.toWei("100")
 	const STAKE_AMOUNT_USD_TARGET = h.toWei("500");
     const PRICE_TRB = h.toWei("50");
 	const REQUIRED_STAKE = h.toWei((parseInt(web3.utils.fromWei(STAKE_AMOUNT_USD_TARGET)) / parseInt(web3.utils.fromWei(PRICE_TRB))).toString());
@@ -45,7 +46,7 @@ describe("TellorFlex - e2e Tests Three", function() {
         governance = await Governance.deploy();
         await governance.deployed();
 		const TellorFlex = await ethers.getContractFactory("TellorFlex");
-		tellor = await TellorFlex.deploy(token.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB, TRB_QUERY_ID);
+		tellor = await TellorFlex.deploy(token.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB, MINIMUM_STAKE_AMOUNT, TRB_QUERY_ID);
         owner = await ethers.getSigner(await tellor.owner())
 		await tellor.deployed();
         await governance.setTellorAddress(tellor.address);

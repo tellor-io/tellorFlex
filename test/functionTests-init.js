@@ -12,6 +12,7 @@ describe("TellorFlex - Function Tests Init Function", function() {
     let govSigner;
 	let accounts;
 	let owner;
+    const MINIMUM_STAKE_AMOUNT = web3.utils.toWei("100")
 	const STAKE_AMOUNT_USD_TARGET = web3.utils.toWei("500");
     const PRICE_TRB = web3.utils.toWei("50");
 	const REPORTING_LOCK = 43200; // 12 hours
@@ -30,7 +31,7 @@ describe("TellorFlex - Function Tests Init Function", function() {
         governance = await Governance.deploy();
         await governance.deployed();
 		const TellorFlex = await ethers.getContractFactory("TellorFlex");
-		tellor = await TellorFlex.deploy(token.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB, TRB_QUERY_ID);
+		tellor = await TellorFlex.deploy(token.address, REPORTING_LOCK, STAKE_AMOUNT_USD_TARGET, PRICE_TRB, MINIMUM_STAKE_AMOUNT, TRB_QUERY_ID);
         owner = await ethers.getSigner(await tellor.owner())
 		await tellor.deployed();
         await governance.setTellorAddress(tellor.address);
