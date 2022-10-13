@@ -1,16 +1,16 @@
-[![Tests](https://github.com/tellor-io/tellorFlex/actions/workflows/tests.yml/badge.svg)](https://github.com/tellor-io/tellorFlex/actions/workflows/tests.ymli)
+[![Tests](https://github.com/tellor-io/tellorFlex/actions/workflows/tests.yml/badge.svg?branch=360)](https://github.com/tellor-io/tellorFlex/actions/workflows/tests.ymli)
 
 ## Overview <a name="overview"> </a>  
 
-<b>TellorFlex</b> is the main Tellor contract for the non-Ethereum chains.  The functions for the oracle contract are almost identical, but the token contracts have been abstracted away. 
+<b>TellorFlex</b> is the main oracle contract for the tellor system.
 
-For more in-depth information about Tellor checkout our [documentation](https://docs.tellor.io/tellor/), [whitepaper](https://docs.tellor.io/tellor/whitepaper/introduction) and [website](https://tellor.io/).
+For more in-depth information about Tellor checkout our [documentation](https://docs.tellor.io), [whitepaper](https://tellor.io/whitepaper/) and [website](https://tellor.io/).
 
 Quick references are included below:
 
 * <b> [Reporter Documentation](https://docs.tellor.io/tellor/reporting-data/introduction)</b>
 
-* <b> [Integration Documentation](https://docs.tellor.io/tellor/getting-data/introduction)</b>
+* <b> [Integration Documentation](https://docs.tellor.io/tellor/getting-data/reading-data)</b>
 
 ## Setting up and testing
 
@@ -38,4 +38,4 @@ Check out our issues log here on Github or feel free to reach out anytime [info@
 
 ## Copyright
 
-Tellor Inc. 2021
+Tellor Inc. 2022
