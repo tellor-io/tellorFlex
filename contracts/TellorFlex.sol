@@ -60,10 +60,10 @@ contract TellorFlex {
     // Events
     event NewReport(
         bytes32 indexed _queryId,
-        uint256 _time,
+        uint256 indexed _time,
         bytes _value,
         uint256 _nonce,
-        bytes indexed _queryData,
+        bytes _queryData,
         address indexed _reporter
     );
     event NewStakeAmount(uint256 _newStakeAmount);
