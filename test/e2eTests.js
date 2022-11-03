@@ -285,6 +285,68 @@ describe("TellorFlex - e2e Tests", function () {
         }
     })
 
+    it("TBR should not borrow from requestWithdraw", async function () {
+        //mint balance
+        await token.mint(accounts[0].address, web3.utils.toWei("1000"))
+        //stake reporter (add 10 TRB stake to contract balance)
+        await token.connect(accounts[0]).approve(tellor.address, h.toWei("1000"))
+        await tellor.connect(accounts[0]).depositStake(h.toWei("100"))
+        await token.mint(accounts[1].address, web3.utils.toWei("1000"))
+        //stake reporter (add 10 TRB stake to contract balance)
+        await token.connect(accounts[1]).approve(tellor.address, h.toWei("1000"))
+        await tellor.connect(accounts[1]).depositStake(h.toWei("100"))
+        await tellor.connect(accounts[0]).requestStakingWithdraw(web3.utils.toWei("100"))
+        await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
+        //TRB balance of flex should be 160 TRB
+        expect(
+            await token.balanceOf(tellor.address)).to.equal(
+                h.toWei("200"),
+                "time based rewards should not pull from requestWithdraw"
+            )
+    })
+    it("TBR should not add from requestWithdraw dispute", async function () {
+        //mint balance
+        await token.mint(accounts[0].address, web3.utils.toWei("1000"))
+        //stake reporter (add 10 TRB stake to contract balance)
+        await token.connect(accounts[0]).approve(tellor.address, h.toWei("1000"))
+        await tellor.connect(accounts[0]).depositStake(h.toWei("100"))
+        await token.mint(accounts[1].address, web3.utils.toWei("1000"))
+        //stake reporter (add 10 TRB stake to contract balance)
+        await token.connect(accounts[1]).approve(tellor.address, h.toWei("1000"))
+        await tellor.connect(accounts[1]).depositStake(h.toWei("100"))
+        await token.mint(accounts[2].address, web3.utils.toWei("1000"))
+        //stake reporter (add 10 TRB stake to contract balance)
+        await token.connect(accounts[2]).approve(tellor.address, h.toWei("1000"))
+        await tellor.connect(accounts[2]).depositStake(h.toWei("100"))
+        await tellor.connect(accounts[0]).requestStakingWithdraw(web3.utils.toWei("100"))
+        await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
+        let blocky = await h.getBlock()
+        //TRB balance of flex should be 160 TRB
+        expect(
+            await token.balanceOf(tellor.address)).to.equal(
+                h.toWei("300"),
+                "time based rewards should not pull from requestWithdraw"
+            )
+        await tellor.connect(govSigner).removeValue(ETH_QUERY_ID, blocky.timestamp)
+        await tellor.connect(govSigner).slashReporter(accounts[1].address, govSigner.address)
+        await h.advanceTime(86400 / 2)
+        await tellor.connect(accounts[2]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
+        expect(
+            await token.balanceOf(tellor.address)).to.equal(
+                h.toWei("200"),
+                "time based rewards should not pull from requestWithdraw"
+            )
+        await token.mint(tellor.address, web3.utils.toWei("100"))
+        expect(
+            await token.balanceOf(tellor.address)).to.equal(
+                h.toWei("300"),
+                "time based rewards should not pull from requestWithdraw"
+            )
+            await h.advanceTime(86400 / 2)
+        await tellor.connect(accounts[2]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
+        assert(await token.balanceOf(tellor.address) < h.toWei("300"),"some TBR should come out")
+    })
+
     it("TBR should not borrow from staking rewards", async function () {
 
         //mint balance
@@ -426,14 +488,26 @@ describe("TellorFlex - e2e Tests", function () {
         await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(420), 0, TRB_QUERY_DATA)
         expect(await token.balanceOf(tellor.address)).to.equal(web3.utils.toWei("200"))
 
-        // Check balance after zeroing stakes & staking rewards
         h.advanceTime(60 * 60 * 24 * 30) // reduce totalStakingRewards to 0
+        await token.mint(accounts[2].address, web3.utils.toWei("100"))
+        await token.connect(accounts[2]).approve(tellor.address, web3.utils.toWei("100"))
+        await tellor.connect(accounts[2]).depositStake(web3.utils.toWei("100"))
+
+
+        // Check balance after zeroing stakes & staking rewards
         await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("1"))
-        expect(await token.balanceOf(tellor.address)).to.equal(web3.utils.toWei("101"))
+        expect(await token.balanceOf(tellor.address)).to.equal(web3.utils.toWei("201"))
         await tellor.connect(accounts[1]).requestStakingWithdraw(web3.utils.toWei("101"))
+        await tellor.connect(accounts[2]).submitValue(TRB_QUERY_ID, h.uintTob32(420), 0, TRB_QUERY_DATA)
+        expect(await token.balanceOf(tellor.address)).to.equal(web3.utils.toWei("201"))
         h.advanceTime(60 * 60 * 24 * 7) // 7 days
         await tellor.connect(accounts[1]).withdrawStake()
-        expect(await token.balanceOf(tellor.address)).to.equal(0)
+        await tellor.connect(accounts[2]).submitValue(TRB_QUERY_ID, h.uintTob32(420), 0, TRB_QUERY_DATA)
+        expect(await token.balanceOf(tellor.address)).to.equal(web3.utils.toWei("100"))
+        await tellor.connect(accounts[2]).requestStakingWithdraw(web3.utils.toWei("100"))
+        h.advanceTime(60 * 60 * 24 * 7) // 7 days
+        await tellor.connect(accounts[2]).withdrawStake()
+        expect(await token.balanceOf(tellor.address)).to.equal(web3.utils.toWei("0"))
     })
 
     it("TBR, stakes, and staking rewards can't borrow from each other", async function () {
