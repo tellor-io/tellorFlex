@@ -157,6 +157,7 @@ contract TellorFlex {
             if (_lockedBalance >= _amount) {
                 // if staker's locked balance covers full _amount, use that
                 _staker.lockedBalance -= _amount;
+                toWithdraw -= _amount;
             } else {
                 // otherwise, stake the whole locked balance and transfer the
                 // remaining amount from the staker's address
@@ -167,6 +168,7 @@ contract TellorFlex {
                         _amount - _lockedBalance
                     )
                 );
+                toWithdraw -= _staker.lockedBalance;
                 _staker.lockedBalance = 0;
             }
         } else {
