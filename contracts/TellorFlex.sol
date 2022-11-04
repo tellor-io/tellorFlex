@@ -30,6 +30,7 @@ contract TellorFlex {
     uint256 public totalRewardDebt; // staking reward debt, used to calculate real staking rewards balance
     uint256 public totalStakeAmount; // total amount of tokens locked in contract (via stake)
     uint256 public totalStakers; // total number of stakers with at least stakeAmount staked, not exact
+    uint256 public toWithdraw; //amountLockedForWithdrawal
 
     mapping(bytes32 => Report) private reports; // mapping of query IDs to a report
     mapping(address => StakeInfo) private stakerDetails; // mapping from a persons address to their staking info
@@ -156,6 +157,7 @@ contract TellorFlex {
             if (_lockedBalance >= _amount) {
                 // if staker's locked balance covers full _amount, use that
                 _staker.lockedBalance -= _amount;
+                toWithdraw -= _amount;
             } else {
                 // otherwise, stake the whole locked balance and transfer the
                 // remaining amount from the staker's address
@@ -166,6 +168,7 @@ contract TellorFlex {
                         _amount - _lockedBalance
                     )
                 );
+                toWithdraw -= _staker.lockedBalance;
                 _staker.lockedBalance = 0;
             }
         } else {
@@ -222,6 +225,7 @@ contract TellorFlex {
         _updateStakeAndPayRewards(msg.sender, _staker.stakedBalance - _amount);
         _staker.startDate = block.timestamp;
         _staker.lockedBalance += _amount;
+        toWithdraw += _amount;
         emit StakeWithdrawRequested(msg.sender, _amount);
     }
 
@@ -245,6 +249,7 @@ contract TellorFlex {
             // if locked balance is at least stakeAmount, slash from locked balance
             _slashAmount = stakeAmount;
             _staker.lockedBalance -= stakeAmount;
+            toWithdraw -= stakeAmount;
         } else if (_lockedBalance + _stakedBalance >= stakeAmount) {
             // if locked balance + staked balance is at least stakeAmount,
             // slash from locked balance and slash remainder from staked balance
@@ -253,11 +258,13 @@ contract TellorFlex {
                 _reporter,
                 _stakedBalance - (stakeAmount - _lockedBalance)
             );
+            toWithdraw -= _lockedBalance;
             _staker.lockedBalance = 0;
         } else {
             // if sum(locked balance + staked balance) is less than stakeAmount,
             // slash sum
             _slashAmount = _stakedBalance + _lockedBalance;
+            toWithdraw -= _lockedBalance;
             _updateStakeAndPayRewards(_reporter, 0);
             _staker.lockedBalance = 0;
         }
@@ -315,7 +322,7 @@ contract TellorFlex {
         uint256 _reward = ((block.timestamp - timeOfLastNewValue) * timeBasedReward) / 300; //.5 TRB per 5 minutes
         uint256 _totalTimeBasedRewardsBalance =
             token.balanceOf(address(this)) -
-            (totalStakeAmount + stakingRewardsBalance);
+            (totalStakeAmount + stakingRewardsBalance + toWithdraw);
         if (_totalTimeBasedRewardsBalance > 0 && _reward > 0) {
             if (_totalTimeBasedRewardsBalance < _reward) {
                 token.transfer(msg.sender, _totalTimeBasedRewardsBalance);
@@ -379,6 +386,7 @@ contract TellorFlex {
             "reporter not locked for withdrawal"
         );
         require(token.transfer(msg.sender, _staker.lockedBalance));
+        toWithdraw -= _staker.lockedBalance;
         _staker.lockedBalance = 0;
         emit StakeWithdrawn(msg.sender);
     }
@@ -800,7 +808,7 @@ contract TellorFlex {
      * @return uint256 amount of trb
      */
     function getTotalTimeBasedRewardsBalance() external view returns (uint256) {
-        return token.balanceOf(address(this)) - (totalStakeAmount + stakingRewardsBalance);
+        return token.balanceOf(address(this)) - (totalStakeAmount + stakingRewardsBalance + toWithdraw);
     }
 
     /**

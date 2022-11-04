@@ -345,4 +345,21 @@ describe("TellorFlex - e2e Tests Two", function() {
         expectedStakerBalance2 += BigInt(h.toWei("100"))
         assert(await token.balanceOf(accounts[3].address) == expectedStakerBalance2, "staker balance should be correct")
     })
+
+    it("Time based rewards don't steal from stakes pending withdrawal", async function() {
+		await token.mint(accounts[0].address, h.toWei("10000"))
+        await token.approve(tellor.address, h.toWei("10000"))
+        await tellor.depositStake(h.toWei("1000"))
+        assert(await tellor.getTotalTimeBasedRewardsBalance() == 0, "total time based rewards balance should be 0")
+        assert(await tellor.toWithdraw() == 0, "toWithdraw should be 0")
+        await tellor.requestStakingWithdraw(h.toWei("100"))
+        assert(await tellor.getTotalTimeBasedRewardsBalance() == 0, "total time based rewards balance should be 0")
+        assert(await tellor.toWithdraw() == h.toWei("100"), "toWithdraw should be correct")
+
+        await tellor.submitValue(h.hash(h.uintTob32(1)), h.uintTob32(1000), 0, h.uintTob32(1))
+        await tellor.connect(govSigner).slashReporter(accounts[0].address, governance.address)
+
+        assert(await tellor.getTotalTimeBasedRewardsBalance() == 0, "total time based rewards balance should be 0")
+        assert(await tellor.toWithdraw() == 0, "toWithdraw should be correct")
+	})
 })
