@@ -16,7 +16,6 @@ describe("TellorFlex - Function Tests", function () {
     const MINIMUM_STAKE_AMOUNT = web3.utils.toWei("100")
 	const STAKE_AMOUNT_USD_TARGET = web3.utils.toWei("500");
 	const PRICE_TRB = web3.utils.toWei("50");
-	const REQUIRED_STAKE = web3.utils.toWei((parseInt(web3.utils.fromWei(STAKE_AMOUNT_USD_TARGET)) / parseInt(web3.utils.fromWei(PRICE_TRB))).toString());
 	const REPORTING_LOCK = 43200; // 12 hours
 	const QUERYID1 = h.uintTob32(1)
 	const QUERYID2 = h.uintTob32(2)
@@ -767,7 +766,6 @@ describe("TellorFlex - Function Tests", function () {
 		
 		// Test no reported TRB price
 		await tellor.updateStakeAmount()
-		console.log("REQUIRED_STAKE: " + web3.utils.fromWei(REQUIRED_STAKE))
 		expect(await tellor.stakeAmount()).to.equal(MINIMUM_STAKE_AMOUNT)
 
 		// Test updating when 12 hrs have NOT passed
@@ -822,6 +820,32 @@ describe("TellorFlex - Function Tests", function () {
 		h.advanceTime(60 * 60 * 12)
 		await tellor.connect(accounts[1]).updateStakeAmount()
 		expect(await tellor.getStakeAmount()).to.equal(MINIMUM_STAKE_AMOUNT)
+
+		// Test updating when price is below inflection price
+		inflectionPrice = h.toWei("5") // BigInt(STAKE_AMOUNT_USD_TARGET) * BigInt(1e18) / BigInt(MINIMUM_STAKE_AMOUNT)
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(inflectionPrice / 2), 0, TRB_QUERY_DATA) // price = inflectionPrice / 2
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.updateStakeAmount()
+		expStakeAmount = BigInt(MINIMUM_STAKE_AMOUNT) * BigInt(2)
+		expect(await tellor.getStakeAmount()).to.equal(BigInt(MINIMUM_STAKE_AMOUNT) * BigInt(2))
+
+		// Test updating when multiple prices have been reported
+		h.advanceTime(60 * 60 * 1)
+		reportedPrice = BigInt(inflectionPrice) / BigInt(1)
+		encodedPrice = abiCoder.encode(['uint256'], [reportedPrice])
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, encodedPrice, 0, TRB_QUERY_DATA)
+		h.advanceTime(60 * 60 * 1)
+		reportedPrice = BigInt(inflectionPrice) / BigInt(2)
+		encodedPrice = abiCoder.encode(['uint256'], [reportedPrice])
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, encodedPrice, 0, TRB_QUERY_DATA)
+		h.advanceTime(60 * 60 * 1)
+		reportedPrice = BigInt(inflectionPrice) / BigInt(3)
+		encodedPrice = abiCoder.encode(['uint256'], [reportedPrice])
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, encodedPrice, 0, TRB_QUERY_DATA)
+		h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).updateStakeAmount()
+		expStakeAmount = BigInt(STAKE_AMOUNT_USD_TARGET) * BigInt(1e18) / (BigInt(inflectionPrice) / BigInt(3))
+		expect(await tellor.getStakeAmount()).to.equal(expStakeAmount)
 	})
 
 	it("_updateRewards()", async function () {
