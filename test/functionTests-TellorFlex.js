@@ -932,6 +932,7 @@ describe("TellorFlex - Function Tests", function () {
 		expect(await tellor.rewardRate()).to.equal(expectedRewardRate)
 		expAccumRewPerShare = expAccumRewPerShare + (BigInt(blocky4.timestamp - blocky3.timestamp) * BigInt(expectedRewardRate) * BigInt(1e18) / BigInt(150e18))
 		expect(await tellor.accumulatedRewardPerShare()).to.equal(expAccumRewPerShare)
+		expect(await tellor.stakingRewardsBalance()).to.equal(expStakingRewardsBal) // shouldn't change
 
 		// advance time 30 days
 		await h.advanceTime(86400 * 30)
