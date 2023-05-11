@@ -16,7 +16,6 @@ describe("TellorFlex - Function Tests", function () {
     const MINIMUM_STAKE_AMOUNT = web3.utils.toWei("100")
 	const STAKE_AMOUNT_USD_TARGET = web3.utils.toWei("500");
 	const PRICE_TRB = web3.utils.toWei("50");
-	const REQUIRED_STAKE = web3.utils.toWei((parseInt(web3.utils.fromWei(STAKE_AMOUNT_USD_TARGET)) / parseInt(web3.utils.fromWei(PRICE_TRB))).toString());
 	const REPORTING_LOCK = 43200; // 12 hours
 	const QUERYID1 = h.uintTob32(1)
 	const QUERYID2 = h.uintTob32(2)
@@ -767,7 +766,6 @@ describe("TellorFlex - Function Tests", function () {
 		
 		// Test no reported TRB price
 		await tellor.updateStakeAmount()
-		console.log("REQUIRED_STAKE: " + web3.utils.fromWei(REQUIRED_STAKE))
 		expect(await tellor.stakeAmount()).to.equal(MINIMUM_STAKE_AMOUNT)
 
 		// Test updating when 12 hrs have NOT passed
@@ -822,23 +820,49 @@ describe("TellorFlex - Function Tests", function () {
 		h.advanceTime(60 * 60 * 12)
 		await tellor.connect(accounts[1]).updateStakeAmount()
 		expect(await tellor.getStakeAmount()).to.equal(MINIMUM_STAKE_AMOUNT)
+
+		// Test updating when price is below inflection price
+		inflectionPrice = h.toWei("5") // BigInt(STAKE_AMOUNT_USD_TARGET) * BigInt(1e18) / BigInt(MINIMUM_STAKE_AMOUNT)
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, h.uintTob32(inflectionPrice / 2), 0, TRB_QUERY_DATA) // price = inflectionPrice / 2
+		await h.advanceTime(60 * 60 * 12)
+		await tellor.updateStakeAmount()
+		expStakeAmount = BigInt(MINIMUM_STAKE_AMOUNT) * BigInt(2)
+		expect(await tellor.getStakeAmount()).to.equal(BigInt(MINIMUM_STAKE_AMOUNT) * BigInt(2))
+
+		// Test updating when multiple prices have been reported
+		h.advanceTime(60 * 60 * 1)
+		reportedPrice = BigInt(inflectionPrice) / BigInt(1)
+		encodedPrice = abiCoder.encode(['uint256'], [reportedPrice])
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, encodedPrice, 0, TRB_QUERY_DATA)
+		h.advanceTime(60 * 60 * 1)
+		reportedPrice = BigInt(inflectionPrice) / BigInt(2)
+		encodedPrice = abiCoder.encode(['uint256'], [reportedPrice])
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, encodedPrice, 0, TRB_QUERY_DATA)
+		h.advanceTime(60 * 60 * 1)
+		reportedPrice = BigInt(inflectionPrice) / BigInt(3)
+		encodedPrice = abiCoder.encode(['uint256'], [reportedPrice])
+		await tellor.connect(accounts[1]).submitValue(TRB_QUERY_ID, encodedPrice, 0, TRB_QUERY_DATA)
+		h.advanceTime(60 * 60 * 12)
+		await tellor.connect(accounts[1]).updateStakeAmount()
+		expStakeAmount = BigInt(STAKE_AMOUNT_USD_TARGET) * BigInt(1e18) / (BigInt(inflectionPrice) / BigInt(3))
+		expect(await tellor.getStakeAmount()).to.equal(expStakeAmount)
 	})
 
 	it("_updateRewards()", async function () {
-		// test totalStakeAmount equals 0
+		// update rewards
 		await tellor.updateRewards()
 		blocky0 = await h.getBlock()
 
+		// state checks
 		expect(await tellor.timeOfLastAllocation()).to.equal(blocky0.timestamp)
 		expect(await tellor.accumulatedRewardPerShare()).to.equal(0)
 		expect(await tellor.rewardRate()).to.equal(0)
 
 		// deposit a stake
-		await token.mint(accounts[1].address, web3.utils.toWei("100"));
-		await token.connect(accounts[1]).approve(tellor.address, h.toWei("200"))
 		await tellor.connect(accounts[1]).depositStake(h.toWei("50"))
 		blocky0 = await h.getBlock()
 
+		// state checks
 		expect(await tellor.timeOfLastAllocation()).to.equal(blocky0.timestamp)
 		expect(await tellor.accumulatedRewardPerShare()).to.equal(0)
 		expect(await tellor.rewardRate()).to.equal(0)
@@ -847,6 +871,7 @@ describe("TellorFlex - Function Tests", function () {
 		await tellor.connect(accounts[1]).depositStake(h.toWei("50"))
 		blocky0 = await h.getBlock()
 
+		// state checks
 		expect(await tellor.timeOfLastAllocation()).to.equal(blocky0.timestamp)
 		expect(await tellor.accumulatedRewardPerShare()).to.equal(0)
 		expect(await tellor.rewardRate()).to.equal(0)
@@ -859,6 +884,7 @@ describe("TellorFlex - Function Tests", function () {
 		await tellor.addStakingRewards(STAKING_REWARDS1)
 		blocky1 = await h.getBlock()
 
+		// state checks
 		expect(await tellor.timeOfLastAllocation()).to.equal(blocky1.timestamp)
 		expect(await tellor.accumulatedRewardPerShare()).to.equal(0)
 		expect(await tellor.stakingRewardsBalance()).to.equal(STAKING_REWARDS1)
@@ -873,6 +899,7 @@ describe("TellorFlex - Function Tests", function () {
 		await tellor.updateRewards()
 		blocky2 = await h.getBlock()
 
+		// state checks
 		expect(await tellor.timeOfLastAllocation()).to.equal(blocky2.timestamp)
 		expect(await tellor.stakingRewardsBalance()).to.equal(STAKING_REWARDS1)
 		expect(await tellor.totalRewardDebt()).to.equal(0)
@@ -881,26 +908,44 @@ describe("TellorFlex - Function Tests", function () {
 		expect(await tellor.accumulatedRewardPerShare()).to.equal(expAccumRewPerShare)
 
 		// deposit another stake
-		await token.mint(accounts[1].address, h.toWei("100"))
-		// await tellor.connect(accounts[1]).depositStake(h.toWei("50"))
-		await tellor.updateRewards()
+		expect(await token.balanceOf(accounts[1].address)).to.equal(h.toWei("900"))
+		await tellor.connect(accounts[1]).depositStake(h.toWei("50"))
 		blocky3 = await h.getBlock()
 
-		expect(await tellor.timeOfLastAllocation()).to.equal(blocky3.timestamp)
-		expect(await tellor.rewardRate()).to.equal(expectedRewardRate)
-		expAccumRewPerShare = expAccumRewPerShare + (BigInt(blocky3.timestamp - blocky2.timestamp) * BigInt(expectedRewardRate) * BigInt(1e18) / BigInt(100e18))
+		// state checks
+		expAccumRewPerShare = expAccumRewPerShare + (BigInt(blocky3.timestamp - blocky2.timestamp)) * BigInt(expectedRewardRate) * BigInt(1e18) / BigInt(100e18)
 		expect(await tellor.accumulatedRewardPerShare()).to.equal(expAccumRewPerShare)
-		expectedStakingRewardsBal = BigInt(STAKING_REWARDS1) - (expAccumRewPerShare * BigInt(h.toWei("100")))
-		// advance time 30 days
-		await h.advanceTime(86400 * 30)
+		expectedPayout = expAccumRewPerShare * BigInt(100e18) / BigInt(1e18)
+		expectedBal = BigInt(h.toWei("900")) - BigInt(h.toWei("50")) + expectedPayout
+		expect(await token.balanceOf(accounts[1].address)).to.equal(expectedBal)
+		expTotalRewardDebt = BigInt(150e18) * expAccumRewPerShare / BigInt(1e18)
+		expect(await tellor.totalRewardDebt()).to.equal(expTotalRewardDebt)
+		expStakingRewardsBal = BigInt(STAKING_REWARDS1) - expectedPayout
+		expect(await tellor.stakingRewardsBalance()).to.equal(expStakingRewardsBal)
 
 		// update rewards
 		await tellor.updateRewards()
 		blocky4 = await h.getBlock()
 
+		// state checks
 		expect(await tellor.timeOfLastAllocation()).to.equal(blocky4.timestamp)
+		expect(await tellor.rewardRate()).to.equal(expectedRewardRate)
+		expAccumRewPerShare = expAccumRewPerShare + (BigInt(blocky4.timestamp - blocky3.timestamp) * BigInt(expectedRewardRate) * BigInt(1e18) / BigInt(150e18))
+		expect(await tellor.accumulatedRewardPerShare()).to.equal(expAccumRewPerShare)
+		expect(await tellor.stakingRewardsBalance()).to.equal(expStakingRewardsBal) // shouldn't change
+
+		// advance time 30 days
+		await h.advanceTime(86400 * 30)
+
+		// update rewards
+		await tellor.updateRewards()
+		blocky5 = await h.getBlock()
+
+		// state checks
+		expect(await tellor.timeOfLastAllocation()).to.equal(blocky5.timestamp)
 		expect(await tellor.rewardRate()).to.equal(0) // rewards ran out, reward rate should be 0
-		expAccumRewPerShare = BigInt(h.toWei("1000")) / BigInt(100)
+		expNewPendingRewards = expStakingRewardsBal - ((expAccumRewPerShare * BigInt(150e18)) / BigInt(1e18) - expTotalRewardDebt)
+		expAccumRewPerShare = expAccumRewPerShare + (expNewPendingRewards * BigInt(1e18)) / BigInt(150e18)
 		expect(await tellor.accumulatedRewardPerShare()).to.equal(expAccumRewPerShare)
 
 		// advance time 1 day
@@ -908,10 +953,10 @@ describe("TellorFlex - Function Tests", function () {
 
 		// update rewards
 		await tellor.updateRewards()
-		blocky4 = await h.getBlock()
+		blocky5 = await h.getBlock()
 
-		// checks, should be no change
-		expect(await tellor.timeOfLastAllocation()).to.equal(blocky4.timestamp) // should update to latest updateRewards ts
+		// state checks
+		expect(await tellor.timeOfLastAllocation()).to.equal(blocky5.timestamp) // should update to latest updateRewards ts
 		expect(await tellor.rewardRate()).to.equal(0) // should still be zero
 		expect(await tellor.accumulatedRewardPerShare()).to.equal(expAccumRewPerShare) // shouldn't change
 	})
