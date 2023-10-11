@@ -36,10 +36,9 @@ describe("TellorFlex - Function Tests", function () {
 		lockedBalance: 2,
 		rewardDebt: 3,
 		reporterLastTimestamp: 4,
-		reportsSubmitted: 5,
-		startVoteCount: 6,
-		startVoteTally: 7,
-        staked: 8
+		startVoteCount: 5,
+		startVoteTally: 6,
+        staked: 7
 	} // getStakerInfo() indices
 
 	beforeEach(async function () {
@@ -101,7 +100,6 @@ describe("TellorFlex - Function Tests", function () {
 		expect(stakerDetails[smap.lockedBalance]).to.equal(0) // lockedBalance
 		expect(stakerDetails[smap.rewardDebt]).to.equal(0) // rewardDebt
 		expect(stakerDetails[smap.reporterLastTimestamp]).to.equal(0) // reporterLastTimestamp
-		expect(stakerDetails[smap.reportsSubmitted]).to.equal(0) // reportsSubmitted
 		expect(stakerDetails[smap.startVoteCount]).to.equal(0) // startVoteCount
 		expect(stakerDetails[smap.startVoteTally]).to.equal(0) // startVoteTally
 		expect(stakerDetails[smap.staked]).to.equal(true) // staked
@@ -292,8 +290,6 @@ describe("TellorFlex - Function Tests", function () {
 		expect(await tellor.retrieveData(ETH_QUERY_ID, blocky.timestamp)).to.equal(h.uintTob32(4001))
 		expect(await tellor.getReporterByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(accounts[1].address)
 		expect(await tellor.timeOfLastNewValue()).to.equal(blocky.timestamp)
-		expect(await tellor.getReportsSubmittedByAddress(accounts[1].address)).to.equal(2)
-		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, ETH_QUERY_ID)).to.equal(2)
 
 		// Test submit multiple identical values w/ min _nonce
 		await token.mint(accounts[2].address, h.toWei("120"))
@@ -308,8 +304,6 @@ describe("TellorFlex - Function Tests", function () {
 		expect(await tellor.retrieveData(ETH_QUERY_ID, blocky.timestamp)).to.equal(h.uintTob32(4001))
 		expect(await tellor.getReporterByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(accounts[1].address)
 		expect(await tellor.timeOfLastNewValue()).to.equal(blocky.timestamp)
-		expect(await tellor.getReportsSubmittedByAddress(accounts[1].address)).to.equal(3)
-		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, ETH_QUERY_ID)).to.equal(3)
 
 		// Test max val for _nonce
 		await h.advanceTime(3600)
@@ -406,26 +400,6 @@ describe("TellorFlex - Function Tests", function () {
 		expect(await tellor.getReporterLastTimestamp(accounts[1].address)).to.equal(blocky.timestamp)
 	})
 
-	it("getReportsSubmittedByAddress", async function () {
-		tellor = await tellor.connect(accounts[1])
-		await tellor.depositStake(web3.utils.toWei("100"))
-		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
-		await h.advanceTime(60 * 60 * 12)
-		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
-		blocky = await h.getBlock()
-		expect(await tellor.getReportsSubmittedByAddress(accounts[1].address)).to.equal(2)
-	})
-
-	it("getReportsSubmittedByAddressAndQueryId", async function () {
-		tellor = await tellor.connect(accounts[1])
-		await tellor.depositStake(web3.utils.toWei("100"))
-		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
-		await h.advanceTime(60 * 60 * 12)
-		await tellor.submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
-		blocky = await h.getBlock()
-		expect(await tellor.getReportsSubmittedByAddressAndQueryId(accounts[1].address, ETH_QUERY_ID)).to.equal(2)
-	})
-
 	it("getStakeAmount", async function () {
 		expect(await tellor.getStakeAmount()).to.equal(MINIMUM_STAKE_AMOUNT)
 	})
@@ -443,7 +417,6 @@ describe("TellorFlex - Function Tests", function () {
 		expect(stakerDetails[smap.lockedBalance]).to.equal(h.toWei("100"))
 		expect(stakerDetails[smap.rewardDebt]).to.equal(0)
 		expect(stakerDetails[smap.reporterLastTimestamp]).to.equal(blocky2.timestamp)
-		expect(stakerDetails[smap.reportsSubmitted]).to.equal(1)
 		expect(stakerDetails[smap.startVoteCount]).to.equal(0)
 		expect(stakerDetails[smap.startVoteTally]).to.equal(0)
 	})
@@ -999,7 +972,7 @@ describe("TellorFlex - Function Tests", function () {
         expect(stakerInfo[smap.stakedBalance]).to.equal(web3.utils.toWei("10")) // staked balance
         expect(stakerInfo[smap.rewardDebt]).to.equal(0) // rewardDebt
         expect(stakerInfo[smap.startVoteCount]).to.equal(2) // startVoteCount
-        expect(stakerInfo[7]).to.equal(1) // startVoteTally
+        expect(stakerInfo[smap.startVoteTally]).to.equal(1) // startVoteTally
         // advance time
         await h.advanceTime(86400 * 10)
         expect(await token.balanceOf(accounts[1].address)).to.equal(h.toWei("990"))
@@ -1018,7 +991,7 @@ describe("TellorFlex - Function Tests", function () {
         expect(stakerInfo[smap.stakedBalance]).to.equal(h.toWei("10")) // staked balance
         expect(stakerInfo[smap.rewardDebt]).to.equal(expectedBalance.sub(h.toWei("990"))) // rewardDebt
         expect(stakerInfo[smap.startVoteCount]).to.equal(2) // startVoteCount
-        expect(stakerInfo[7]).to.equal(1) // startVoteTally
+        expect(stakerInfo[smap.startVoteTally]).to.equal(1) // startVoteTally
         // start a dispute
         await governance.beginDisputeMock()
         // advance time
@@ -1038,7 +1011,7 @@ describe("TellorFlex - Function Tests", function () {
         expect(stakerInfo[smap.stakedBalance]).to.equal(h.toWei("10")) // staked balance
         expect(stakerInfo[smap.rewardDebt]).to.equal(expectedRewardDebt) // rewardDebt
         expect(stakerInfo[smap.startVoteCount]).to.equal(2) // startVoteCount
-        expect(stakerInfo[7]).to.equal(1) // startVoteTally
+        expect(stakerInfo[smap.startVoteTally]).to.equal(1) // startVoteTally
         // start a dispute and vote
         await governance.beginDisputeMock()
         await governance.connect(accounts[1]).voteMock(4)
@@ -1060,7 +1033,7 @@ describe("TellorFlex - Function Tests", function () {
         expect(stakerInfo[smap.stakedBalance]).to.equal(h.toWei("10")) // staked balance
         expect(stakerInfo[smap.rewardDebt]).to.equal(expectedRewardDebt) // rewardDebt
         expect(stakerInfo[smap.startVoteCount]).to.equal(2) // startVoteCount
-        expect(stakerInfo[7]).to.equal(1) // startVoteTally
+        expect(stakerInfo[smap.startVoteTally]).to.equal(1) // startVoteTally
         expect(await tellor.stakingRewardsBalance()).to.equal(BN(h.toWei("1000")).sub(expectedBalance).add(h.toWei("990")))
     })
 
