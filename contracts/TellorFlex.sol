@@ -13,18 +13,18 @@ import "./interfaces/IERC20.sol";
 */
 contract TellorFlex {
     // Storage
-    IERC20 public token; // token used for staking and rewards
+    IERC20 public immutable token; // token used for staking and rewards
     address public governance; // address with ability to remove values and slash reporters
-    address public owner; // contract deployer, can call init function once
+    address public immutable owner; // contract deployer, can call init function once
     uint256 public accumulatedRewardPerShare; // accumulated staking reward per staked token
-    uint256 public minimumStakeAmount; // minimum amount of tokens required to stake
-    uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
+    uint256 public immutable minimumStakeAmount; // minimum amount of tokens required to stake
+    uint256 public immutable reportingLock; // base amount of time before a reporter is able to submit a value again
     uint256 public rewardRate; // total staking rewards released per second
     uint256 public stakeAmount; // minimum amount required to be a staker
-    uint256 public stakeAmountDollarTarget; // amount of US dollars required to be a staker
+    uint256 public immutable stakeAmountDollarTarget; // amount of US dollars required to be a staker
     uint256 public stakingRewardsBalance; // total amount of staking rewards
-    bytes32 public stakingTokenPriceQueryId; // staking token SpotPrice queryId, used for updating stakeAmount
-    uint256 public timeBasedReward = 5e17; // amount of TB rewards released per 5 minutes
+    bytes32 public immutable stakingTokenPriceQueryId; // staking token SpotPrice queryId, used for updating stakeAmount
+    uint256 public constant timeBasedReward = 5e17; // amount of TB rewards released per 5 minutes
     uint256 public timeOfLastAllocation; // time of last update to accumulatedRewardPerShare
     uint256 public timeOfLastNewValue = block.timestamp; // time of the last new submitted value, originally set to the block timestamp
     uint256 public totalRewardDebt; // staking reward debt, used to calculate real staking rewards balance
@@ -39,7 +39,6 @@ contract TellorFlex {
     struct Report {
         uint256[] timestamps; // array of all newValueTimestamps reported
         mapping(uint256 => uint256) timestampIndex; // mapping of timestamps to respective indices
-        mapping(uint256 => uint256) timestampToBlockNum; // mapping of timestamp to block number
         mapping(uint256 => bytes) valueByTimestamp; // mapping of timestamps to values
         mapping(uint256 => address) reporterByTimestamp; // mapping of timestamps to reporters
         mapping(uint256 => bool) isDisputed;
@@ -315,7 +314,6 @@ contract TellorFlex {
         // Update number of timestamps, value for given timestamp, and reporter for timestamp
         _report.timestampIndex[block.timestamp] = _report.timestamps.length;
         _report.timestamps.push(block.timestamp);
-        _report.timestampToBlockNum[block.timestamp] = block.number;
         _report.valueByTimestamp[block.timestamp] = _value;
         _report.reporterByTimestamp[block.timestamp] = msg.sender;
         // Disperse Time Based Reward
@@ -332,8 +330,8 @@ contract TellorFlex {
         }
         // Update last oracle value and number of values submitted by a reporter
         timeOfLastNewValue = block.timestamp;
-        _staker.reportsSubmitted++;
-        _staker.reportsSubmittedByQueryId[_queryId]++;
+        unchecked {_staker.reportsSubmitted++;}
+        unchecked {_staker.reportsSubmittedByQueryId[_queryId]++;}
         emit NewReport(
             _queryId,
             block.timestamp,
@@ -396,20 +394,6 @@ contract TellorFlex {
     // *                               Getters                                     *
     // *                                                                           *
     // *****************************************************************************
-
-    /**
-     * @dev Returns the block number at a given timestamp
-     * @param _queryId is ID of the specific data feed
-     * @param _timestamp is the timestamp to find the corresponding block number for
-     * @return uint256 block number of the timestamp for the given data ID
-     */
-    function getBlockNumberByTimestamp(bytes32 _queryId, uint256 _timestamp)
-        external
-        view
-        returns (uint256)
-    {
-        return reports[_queryId].timestampToBlockNum[_timestamp];
-    }
 
     /**
      * @dev Returns the current value of a data feed given a specific ID

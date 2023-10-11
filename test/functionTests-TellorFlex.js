@@ -289,7 +289,6 @@ describe("TellorFlex - Function Tests", function () {
 		blocky = await h.getBlock()
 		expect(await tellor.getTimestampIndexByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(1)
 		expect(await tellor.getTimestampbyQueryIdandIndex(ETH_QUERY_ID, 1)).to.equal(blocky.timestamp)
-		expect(await tellor.getBlockNumberByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(blocky.number)
 		expect(await tellor.retrieveData(ETH_QUERY_ID, blocky.timestamp)).to.equal(h.uintTob32(4001))
 		expect(await tellor.getReporterByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(accounts[1].address)
 		expect(await tellor.timeOfLastNewValue()).to.equal(blocky.timestamp)
@@ -306,7 +305,6 @@ describe("TellorFlex - Function Tests", function () {
 		blocky = await h.getBlock()
 		expect(await tellor.getTimestampIndexByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(3)
 		expect(await tellor.getTimestampbyQueryIdandIndex(ETH_QUERY_ID, 3)).to.equal(blocky.timestamp)
-		expect(await tellor.getBlockNumberByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(blocky.number)
 		expect(await tellor.retrieveData(ETH_QUERY_ID, blocky.timestamp)).to.equal(h.uintTob32(4001))
 		expect(await tellor.getReporterByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(accounts[1].address)
 		expect(await tellor.timeOfLastNewValue()).to.equal(blocky.timestamp)
@@ -339,13 +337,6 @@ describe("TellorFlex - Function Tests", function () {
 		expect(stakerDetails[smap.stakedBalance]).to.equal(h.toWei("90"))
 		expect(stakerDetails[smap.lockedBalance]).to.equal(0)
 		await h.expectThrow(tellor.connect(accounts[1]).withdrawStake()) // test require: reporter not locked for withdrawal
-	})
-
-	it("getBlockNumberByTimestamp", async function () {
-		await tellor.connect(accounts[1]).depositStake(web3.utils.toWei("100"))
-		await tellor.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.uintTob32(4000), 0, ETH_QUERY_DATA)
-		blocky = await h.getBlock()
-		expect(await tellor.getBlockNumberByTimestamp(ETH_QUERY_ID, blocky.timestamp)).to.equal(blocky.number)
 	})
 
 	it("getCurrentValue", async function () {
