@@ -30,10 +30,9 @@ describe("TellorFlex - e2e Tests Three", function() {
 		lockedBalance: 2,
 		rewardDebt: 3,
 		reporterLastTimestamp: 4,
-		reportsSubmitted: 5,
-		startVoteCount: 6,
-		startVoteTally: 7,
-        staked: 8
+		startVoteCount: 5,
+		startVoteTally: 6,
+        staked: 7
 	} // getStakerInfo() indices
 
 	beforeEach(async function () {
