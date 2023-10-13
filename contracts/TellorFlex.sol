@@ -555,7 +555,6 @@ contract TellorFlex {
 
     /**
      * @dev Returns the number of values submitted by a specific reporter address
-     * Note: This function is deprecated and will always return 0
      * @param _reporter is the address of a reporter
      * @return uint256 the number of values submitted by the given reporter
      */
@@ -583,7 +582,7 @@ contract TellorFlex {
      * @return uint current amount locked for withdrawal
      * @return uint reward debt used to calculate staking rewards
      * @return uint reporter's last reported timestamp
-     * @return uint total number of reports submitted by reporter - deprecated, always 0
+     * @return uint total number of reports submitted by reporter
      * @return uint governance vote count when first staked
      * @return uint number of votes cast by staker when first staked
      * @return bool whether staker is counted in totalStakers
