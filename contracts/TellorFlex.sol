@@ -329,6 +329,9 @@ contract TellorFlex {
         }
         // Update last oracle value and number of values submitted by a reporter
         timeOfLastNewValue = block.timestamp;
+        unchecked{
+            _staker.reportsSubmitted++;
+        }
         emit NewReport(
             _queryId,
             block.timestamp,
