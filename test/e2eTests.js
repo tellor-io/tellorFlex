@@ -35,9 +35,10 @@ describe("TellorFlex - e2e Tests", function () {
         lockedBalance: 2,
         rewardDebt: 3,
         reporterLastTimestamp: 4,
-        startVoteCount: 5,
-        startVoteTally: 6,
-        staked: 7
+        reportsSubmitted: 5,
+        startVoteCount: 6,
+        startVoteTally: 7,
+        staked: 8
     } // getStakerInfo() indices
 
     beforeEach(async function () {
@@ -117,6 +118,10 @@ describe("TellorFlex - e2e Tests", function () {
             count = await tellor.getNewValueCountbyQueryId(queryId)
             assert(count == 2, "new value count should be correct")
         }
+        let repC1 = await tellor.getReportsSubmittedByAddress(accounts[1].address)
+        let repC2 = await tellor.getReportsSubmittedByAddress(accounts[2].address)
+        assert(repC1 == 50, "reporter count 1 should be correct")
+        assert(repC2 == 50, "reporter 2 count should be correct")
     })
     it("Realistic test (actual variables we'll use)", async function () {
         for (i = 0; i < 20; i++) {

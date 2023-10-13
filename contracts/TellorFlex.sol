@@ -50,6 +50,7 @@ contract TellorFlex {
         uint256 lockedBalance; // amount locked for withdrawal
         uint256 rewardDebt; // used for staking reward calculation
         uint256 reporterLastTimestamp; // timestamp of reporter's last reported value
+        uint256 reportsSubmitted; // total number of reports submitted by reporter
         uint256 startVoteCount; // total number of governance votes when stake deposited
         uint256 startVoteTally; // staker vote tally when stake deposited
         bool staked; // used to keep track of total stakers
@@ -328,6 +329,9 @@ contract TellorFlex {
         }
         // Update last oracle value and number of values submitted by a reporter
         timeOfLastNewValue = block.timestamp;
+        unchecked{
+            _staker.reportsSubmitted++;
+        }
         emit NewReport(
             _queryId,
             block.timestamp,
@@ -550,6 +554,20 @@ contract TellorFlex {
     }
 
     /**
+     * @dev Returns the number of values submitted by a specific reporter address
+     * Note: This function is deprecated and will always return 0
+     * @param _reporter is the address of a reporter
+     * @return uint256 the number of values submitted by the given reporter
+     */
+    function getReportsSubmittedByAddress(address _reporter)
+        external
+        view
+        returns (uint256)
+    {
+        return stakerDetails[_reporter].reportsSubmitted;
+    }
+
+    /**
      * @dev Returns amount required to report oracle values
      * @return uint256 stake amount
      */
@@ -565,6 +583,7 @@ contract TellorFlex {
      * @return uint current amount locked for withdrawal
      * @return uint reward debt used to calculate staking rewards
      * @return uint reporter's last reported timestamp
+     * @return uint total number of reports submitted by reporter - deprecated, always 0
      * @return uint governance vote count when first staked
      * @return uint number of votes cast by staker when first staked
      * @return bool whether staker is counted in totalStakers
@@ -573,6 +592,7 @@ contract TellorFlex {
         external
         view
         returns (
+            uint256,
             uint256,
             uint256,
             uint256,
@@ -590,6 +610,7 @@ contract TellorFlex {
             _staker.lockedBalance,
             _staker.rewardDebt,
             _staker.reporterLastTimestamp,
+            _staker.reportsSubmitted,
             _staker.startVoteCount,
             _staker.startVoteTally,
             _staker.staked
